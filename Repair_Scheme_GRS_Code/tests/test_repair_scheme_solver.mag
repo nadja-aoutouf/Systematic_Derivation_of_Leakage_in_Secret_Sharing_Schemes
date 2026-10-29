@@ -1,0 +1,104 @@
+///////////////////////////////////////////////////////////////////////
+// Tests for the Linear Exact Repair Scheme Solver
+///////////////////////////////////////////////////////////////////////
+//
+// Verifies that every returned repair matrix satisfies:
+//   1. Dual-code orthogonality
+//   2. Linear independence at the repaired coordinate
+//   3. Rank-at-most-one constraints at helper coordinates
+//
+///////////////////////////////////////////////////////////////////////
+
+// Load implementations
+load "../src/grs_generator.m";
+load "../src/repair_scheme_solver.m";
+
+// ------------------------------------------------------------
+// Test parameters
+// ------------------------------------------------------------
+q := 2;
+t := 2;
+k := 2;
+
+K := GF(q);
+F := GF(q^t);
+n := q^t;
+
+// ------------------------------------------------------------
+// Helper function: Compute rank over the base field
+// ------------------------------------------------------------
+//
+// Converts a sequence of extension-field elements into a
+// matrix over GF(q), using their coordinate representations.
+//
+// The rank gives the dimension of their GF(q)-linear span.
+//
+
+function SubfieldRank(elements, K)
+
+    coordinate_rows := [Eltseq(x) : x in elements];
+    M := Matrix(K, #elements, #coordinate_rows[1],&cat coordinate_rows);
+    return Rank(M);
+
+end function;
+
+
+// ------------------------------------------------------------
+// Test function: Verify all returned repair matrices
+// ------------------------------------------------------------
+
+procedure VerifyRepairSchemes(G_F, solutions, K, t)
+
+    n := Ncols(G_F);
+    assert #solutions gt 0;
+    for i in [1..#solutions] do
+        A := solutions[i];
+
+        // Check matrix dimensions
+        assert Nrows(A) eq t;
+        assert Ncols(A) eq n;
+
+        // ----------------------------------------------------
+        // Test 1: Dual-code orthogonality
+        // ----------------------------------------------------
+        product := G_F * Transpose(A);
+        assert IsZero(product);
+
+        // ----------------------------------------------------
+        // Test 2: Independence at repaired coordinate
+        // ----------------------------------------------------
+        repaired_symbols := [A[j,1] : j in [1..t]];
+        assert SubfieldRank(repaired_symbols, K) eq t;
+
+        // ----------------------------------------------------
+        // Test 3: Rank constraint at helper coordinates
+        // ----------------------------------------------------
+        for j in [2..n] do
+            helper_symbols := [A[s,j] : s in [1..t]];
+            assert SubfieldRank(helper_symbols, K) le 1;
+        end for;
+    end for;
+    printf "PASS: All %o repair matrices satisfy the constraints.\n",#solutions;
+
+end procedure;
+
+
+// ============================================================
+// Test 1: Reed-Solomon code
+// ============================================================
+
+print "Testing Reed-Solomon repair schemes...";
+G_RS := RS_G_F(q, t, k);
+I_RS, solutions_RS := SetOfAllDualCodewords(q, t, k, G_RS);
+VerifyRepairSchemes(G_RS, solutions_RS, K, t);
+
+// ============================================================
+// Test 2: Generalized Reed-Solomon code
+// ============================================================
+
+print "\nTesting generalized Reed-Solomon repair schemes...";
+multipliers := [F.1^i : i in [0..n-1]];
+G_GRS := GRSGeneratorMatrix(q, t, k, multipliers);
+I_GRS, solutions_GRS := SetOfAllDualCodewords(q, t, k, G_GRS);
+VerifyRepairSchemes(G_GRS, solutions_GRS, K, t);
+print "\nAll repair scheme tests passed.";

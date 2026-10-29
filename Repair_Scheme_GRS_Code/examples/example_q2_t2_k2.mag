@@ -1,0 +1,51 @@
+// ============================================================
+// Example: Repair schemes for RS and GRS codes over GF(4)
+// ============================================================
+
+// Load the implementations
+load "../src/grs_generator.m";
+load "../src/repair_scheme_solver.m";
+
+// Define parameters
+q := 2;
+t := 2;
+k := 2;
+
+K := GF(q);
+F := GF(q^t);
+n := q^t;
+
+// Define evaluation points and non-trivial multipliers
+evaluation_points := [f : f in F];
+multipliers := [F.1^i : i in [0..#evaluation_points - 1]];
+
+// ============================================================
+// Example 1: Reed-Solomon code
+// ============================================================
+
+print "Computing repair schemes for RS code";
+printf "Parameters: q = %o, t = %o, k = %o, n = %o\n", q, t, k, n;
+
+G_RS := RS_G_F(q, t, k);
+print "\nGenerator matrix:";
+print G_RS;
+
+I_RS, solutions_RS := SetOfAllDualCodewords(q, t, k, G_RS);
+printf "\nNumber of distinct repair matrices: %o\n", #solutions_RS;
+
+// ============================================================
+// Example 2: Generalized Reed-Solomon code
+// ============================================================
+
+print "Computing repair schemes for GRS code";
+printf "Parameters: q = %o, t = %o, k = %o, n = %o\n", q, t, k, n;
+
+G_GRS := GRSGeneratorMatrix(q, t, k, multipliers);
+print "\nGenerator matrix:";
+print G_GRS;
+print "\nColumn multipliers:";
+print multipliers;
+
+I_GRS, solutions_GRS := SetOfAllDualCodewords(q, t, k, G_GRS);
+printf "\nNumber of distinct repair matrices: %o\n", #solutions_GRS;
+

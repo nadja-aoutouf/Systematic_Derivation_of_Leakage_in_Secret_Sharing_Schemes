@@ -1,0 +1,43 @@
+// ============================================================
+// Tests for RS and GRS Generator Matrices
+// ============================================================
+
+load "../src/grs_generator.m";
+
+q := 2;
+t := 2;
+k := 2;
+
+F := GF(q^t);
+n := q^t;
+
+// Test 1: RS generator matrix dimensions
+G_RS := RS_G_F(q, t, k);
+
+assert Nrows(G_RS) eq k;
+assert Ncols(G_RS) eq n;
+
+print "PASS: RS generator matrix dimensions";
+
+// Test 2: RS generator matrix rank
+assert Rank(G_RS) eq k;
+
+print "PASS: RS generator matrix rank";
+
+// Test 3: GRS with trivial multipliers
+G_GRS := GRSGeneratorMatrix(q, t, k, []);
+
+assert Nrows(G_GRS) eq k;
+assert Ncols(G_GRS) eq n;
+assert Rank(G_GRS) eq k;
+
+print "PASS: GRS generator matrix dimensions and rank";
+
+// Test 4: Non-trivial multipliers
+multipliers := [F.1^i : i in [0..n-1]];
+G_GRS_nontrivial := GRSGeneratorMatrix(q, t, k, multipliers);
+
+assert Rank(G_GRS_nontrivial) eq k;
+
+print "PASS: GRS generator matrix with non-trivial multipliers";
+print "\nAll generator matrix tests passed.";

@@ -1,0 +1,90 @@
+// ============================================================
+// Generator Matrices for RS and GRS Codes
+// ============================================================
+//
+// This file provides functions to construct generator matrices
+// for full-length Reed-Solomon (RS) and generalized
+// Reed-Solomon (GRS) codes over finite fields.
+//
+// The code length is n = q^t, and the evaluation points
+// consist of all elements of GF(q^t).
+//
+// Functions:
+//   RS_G_F(q, t, k)
+//   GRSGeneratorMatrix(q, t, k, multipliers)
+//
+// ============================================================
+
+
+// ------------------------------------------------------------
+// Function: RS_G_F
+// ------------------------------------------------------------
+//
+// Constructs the generator matrix of a full-length RS code.
+//
+// Parameters:
+//   q : Size of the base field
+//   t : Extension degree
+//   k : Code dimension
+//
+// Returns:
+//   A k x n generator matrix over GF(q^t), where n = q^t.
+//
+// ------------------------------------------------------------
+
+RS_G_F := function(q,t,k)
+
+	K := GF(q); // Base field
+	F := GF(q^t); // Finite field GF(q^t);
+	n := q^t; // Length of the code: number of evaluation points 
+	evaluation_points := [ f : f in F]; // Define evaluation points
+    G_F := Matrix(F, k, n, [ evaluation_points[j]^(i-1) :  j in [1..n], i in [1..k] ]);
+    return G_F;
+	
+end function;
+
+
+// ------------------------------------------------------------
+// Function: GRSGeneratorMatrix
+// ------------------------------------------------------------
+//
+// Constructs the generator matrix of a full-length GRS code.
+//
+// Parameters:
+//   q           : Size of the base field
+//   t           : Extension degree
+//   k           : Code dimension
+//   multipliers : Column multipliers in GF(q^t). An empty sequence uses multiplier 1 at every coordinate.
+//
+// Returns:
+//   A k x n generator matrix over GF(q^t), where n = q^t.
+//
+// ------------------------------------------------------------
+
+function GRSGeneratorMatrix(q, t, k, multipliers)
+
+    // Define base and extension fields
+    K := GF(q);
+    F := GF(q^t);
+    n := q^t;
+    evaluation_points := [f : f in F ]; 
+
+    // Default: all multipliers = 1
+    if #multipliers eq 0 then
+        multipliers := [F!1 : i in [1..n]];
+    elif #multipliers ne n then
+        error "Length of multipliers must match number of evaluation points";
+    end if;
+
+    // Initialize generator matrix
+    G := ZeroMatrix(F, k, n);
+
+    // Fill matrix: G[i][j] = multipliers[j] * α_j^(i-1)
+    for i in [1..k] do
+        for j in [1..n] do
+            G[i][j] := multipliers[j] * evaluation_points[j]^(i - 1);
+        end for;
+    end for;
+
+    return G;
+end function;
