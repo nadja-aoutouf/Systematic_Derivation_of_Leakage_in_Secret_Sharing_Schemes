@@ -1,0 +1,131 @@
+///////////////////////////////////////////////////////////////////////
+// Distributed Worker for Deriving Reed-Solomon Repair Schemes 
+///////////////////////////////////////////////////////////////////////
+//
+// Description:
+//   Executes individual tasks dispatched by the distributed manager.
+//
+//   Each task is identified by an integer representing an
+//   assignment to the fixed variables in the repair matrix.
+//
+//   The worker converts the task number into a base-q vector
+//   and invokes SetOfAllDualCodewords to search for repair schemes.
+//
+//   For each task, the worker creates a separate directory
+//   containing the computed solutions, runtime information, and execution status.
+//
+// Dependencies:
+//   - parameters.mag
+//   - repair_scheme_solver.mag
+//   - Magma's MonitoredDistributedWorker
+//
+// Configuration:
+//   The launching shell script replaces the following placeholders before execution:
+//     JOB_FOLDER_PLACEHOLDER
+//     WORKER_ID_PLACEHOLDER
+//
+// Input:
+//   num : Integer task identifier provided by the manager.
+//
+// Output:
+//   For each task:
+//     objects.mag  : Magma objects
+//     output.mag   : Human-readable solution 
+//     data_*.txt  : Execution time
+//     status_*.txt: Execution status
+//
+//   Returns a formatted string containing:
+//     task number, number of repair matrices, number of repair schemes.
+//
+///////////////////////////////////////////////////////////////////////
+
+load "parameters.mag";
+load "repair_scheme_solver.mag"; // loads the function: SetOfAllDualCodewords(q,t,k,n,l , list)
+host := "localhost";
+fname := Sprintf("port_%o.txt", port_num);
+port := StringToInteger(Trim(Read(fname))); // read the port chosen by the manager
+len := 2*(n - 1 - l);
+
+// job_folder and worker_id will be defined at the top of the file
+// The shell script will replace these lines dynamically
+
+function IntegerToBaseQVector(num, len, q)
+    return [ (num div q^(i-1)) mod q : i in [len..1 by -1] ];
+end function;
+
+// Placeholders (will be replaced by shell)
+job_folder := "JOB_FOLDER_PLACEHOLDER";
+worker_id := WORKER_ID_PLACEHOLDER;
+
+// Define the task function
+//function task(num, worker_id)
+function task(num) // only one argument since it can not take more then one ....
+    start_time := Realtime();
+    task_folder := Sprintf("%o/Task_%o_%o", job_folder, worker_id, num);
+    System(Sprintf("mkdir -p %o", task_folder));
+    print Sprintf("Worker %o handling task %o in folder %o", worker_id, num, task_folder);
+    
+    list := IntegerToBaseQVector(num, len, q);
+
+    // create status file
+    status_file := Sprintf("%o/status_%o_%o.txt", task_folder, worker_id, num);
+    file := Open(status_file, "w");
+    fprintf file, "started\n";
+    delete file; // command to close the file safely - it does not delete the file!
+
+    has_solution, solutions_over_F, solutions_u_v := SetOfAllDualCodewords(q, t, k, n, l, list);
+
+	if not has_solution then 
+		solutions_over_F := [];
+		solutions_u_v := [];
+	end if;
+
+    // add Objects into Object file
+    filename := Sprintf("%o/objects.mag", task_folder);
+    file := Open(filename, "a");
+    WriteObject(file, num);
+    WriteObject(file, list);
+    WriteObject(file, solutions_u_v);
+    WriteObject(file, solutions_over_F);
+    delete file;
+
+    // add information into output file
+    filename := Sprintf("%o/output.mag", task_folder);
+    file := Open(filename, "a");
+
+    fprintf file, "task_number := %o;\n", num;
+    fprintf file, "input_vector := %o;\n", list;             // task number encoded
+    fprintf file, "solutions_u_v := %o;\n", solutions_u_v; // Variety 
+    fprintf file, "solutions_over_F := %o;\n", solutions_over_F;
+    
+    elapsed := Realtime(start_time); // to save the time needed per task 
+
+    // create data file to save the time
+    data_file := Sprintf("%o/data_%o_%o.txt", task_folder, worker_id, num);
+    file := Open(data_file, "w");
+    fprintf file, "Time per task: %o\n", elapsed; // save the time
+    delete file; // command to close the file safely - it does not delete the file!
+
+    // update the status file
+    if has_solution then
+
+		// mark status finished
+		file := Open(status_file, "w");
+		fprintf file, "finished\n";
+		delete file;
+		//return <num, list, #solutions_over_F, elapsed>;
+		return Sprintf("%o & %o  & %o \\\\", num, #solutions_over_F, #solutions_u_v); 
+    else
+		// mark status finished
+		file := Open(status_file, "w");
+		fprintf file, "finished\n";
+		delete file;
+        //return <num, list, 0, elapsed>;
+		return Sprintf("%o  & 0  & 0 \\\\", num); 
+    end if;
+end function;
+
+MonitoredDistributedWorker(host, port, task);
+
+quit;
+

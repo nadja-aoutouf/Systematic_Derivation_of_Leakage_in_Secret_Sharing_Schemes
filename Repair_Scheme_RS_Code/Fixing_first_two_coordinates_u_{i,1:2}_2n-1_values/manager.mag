@@ -1,0 +1,150 @@
+///////////////////////////////////////////////////////////////////////
+// Distributed Manager for Reed-Solomon Repair Scheme Computations
+///////////////////////////////////////////////////////////////////////
+//
+// Description:
+//   Coordinates the distributed search for LERSs via Gröbner approach.
+//
+//   The manager enumerates possible assignments to the first two fixed entries of each nonzero helper block.
+//   Candidate assignments are filtered using restrictions derived from the minimum distance of the dual code.
+//   Valid assignments are grouped into batches and dispatched to workers using Magma's distributed computation interface.
+//
+//   Each batch is assigned a separate communication port to avoid socket conflicts between consecutive batches.
+//
+// Input:
+//   Parameters loaded from parameters.mag:
+//
+//     q        : Size of the base field GF(q)
+//     t        : Extension degree
+//     k        : Dimension of the Reed-Solomon code
+//     n        : Code length
+//     l        : Number of prescribed zero helper blocks
+//     port_num : Base communication port
+//
+// Output:
+//   - Dispatches task indices to distributed workers.
+//   - Prints batch execution times and overall runtime.
+//   - Appends execution statistics to data_job.txt.
+//
+// Dependencies:
+//   - parameters.mag
+//   - start_worker.sh
+//   - Magma's DistributedManager and Socket functionality
+//
+// Notes:
+//   - The total search space contains q^(2*(n-1-l)) possible assignments before filtering.
+//   - Tasks are dispatched in batches of at most 2^13.
+//   - Workers are launched separately for each batch.
+//   - The job directory is configured through JOB_FOLDER_PLACEHOLDER.
+//
+///////////////////////////////////////////////////////////////////////
+
+load "parameters.mag";
+
+len := 2*(n - 1)- 2*l; // number of fixed variables left after l columns are fixed to zero
+total := q^len;
+
+// =====================================================
+// Define helper functions: Integer conversion and zero counting
+// =====================================================
+// Convert integer to base-q vector of length `len`
+function IntegerToBaseQVector(num, len, q)
+    return [ (num div q^(i-1)) mod q : i in [len..1 by -1] ];
+end function;
+
+// Compute zero count (number of zero entries)
+function ZeroCount(vec)
+    return #[ x : x in vec | x eq 0 ];
+end function;
+
+// =====================================================
+// Manager setup
+// =====================================================
+// Maximum allowed numer of zeros (dual minimal distance)
+maw_zero_count := n - k - 1; //  d_dual := (k+1) 
+
+// =====================================================
+// Filter Assignments: excludes assignments that violate the minimum-distance constraint of the dual code.
+// =====================================================
+
+// define variables such that we have at most 2^13 tasks per batch 
+batch_size := 2^13;              // upper bound per dispatch
+batch      := [];                // current batch of task indices
+batch_no   := 0;                 // batch counter
+sent_total := 0;                 // total tasks sent so far
+
+fname := Sprintf("port_%o.txt", port_num);
+F := Open(fname, "w");
+fprintf F, "%o\n", port_num;
+delete F;
+
+// helper function to run one batch on its own socket/port
+procedure RunOneBatch(B, batch_no)
+    // choose a port per batch to avoid TIME_WAIT clashes
+    P := port_num + batch_no;
+
+    // update port
+    fname := Sprintf("port_%o.txt", port_num);
+    F := Open(fname, "w");
+    fprintf F, "%o\n", P;
+    delete F;
+    print Sprintf("Using port %o", P);
+
+    // fresh socket for this batch
+    s := Socket(: LocalHost := "localhost", LocalPort := P);
+
+    // Start workers for this port (in the background)
+    v1 := System("bash start_worker.sh &"); // note v1 and v2 are dummy variables
+    v2 := DistributedManager(s, B);
+    delete s;
+
+end procedure;
+
+// Build + dispatch in a single pass 
+t0 := Realtime();
+for i in [0..total-1] do
+    vec := IntegerToBaseQVector(i, len, q);
+
+    u_1 := vec[1..len div 2]; // variables corresponding to u_{i,1}
+    u_2 := vec[len div 2 +1 ..len]; // variables corresponding to u_{i,2}
+
+    if ZeroCount(u_1) + l le maw_zero_count and ZeroCount(u_2) + l le maw_zero_count then // + 1 since l columns are zero and therefore the second codesymbol
+        Append(~batch, i);
+        if #batch eq batch_size then
+            batch_no +:= 1;
+            print Sprintf("Dispatching batch %o (size %o)...", batch_no, #batch);
+            tb := Realtime();
+            //res := DistributedManager(socket, batch);
+            RunOneBatch(batch,batch_no);
+            print Sprintf("Batch %o time: %o", batch_no, Realtime() - tb);
+
+            sent_total +:= #batch;
+            batch := []; // clear for next round
+        end if;
+    end if;
+end for;
+
+// Flush any remaining tasks
+if #batch gt 0 then
+    batch_no +:= 1;
+    print Sprintf("Dispatching batch %o (size %o)...", batch_no, #batch);
+    tb := Realtime();
+    RunOneBatch(batch, batch_no);
+    //res := DistributedManager(socket, batch);
+    print Sprintf("Batch %o time: %o", batch_no, Realtime() - tb);
+    sent_total +:= #batch;
+end if;
+
+print Sprintf("Dispatched %o tasks across %o batch(es).", sent_total, batch_no);
+print Sprintf("Total time: %o", Realtime() - t0);
+
+job_folder := "JOB_FOLDER_PLACEHOLDER";
+data_file := Sprintf("%o/data_job.txt", job_folder);
+file := Open(data_file, "a");
+//fprintf file, "started\n";
+fprintf file, "Dispatched %o tasks across %o batch(es).\n", sent_total, batch_no;
+fprintf file, "Total time: %o\n", Realtime() - t0;
+delete file; 
+
+quit;
+
