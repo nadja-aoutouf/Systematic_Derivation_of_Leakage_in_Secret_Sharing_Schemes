@@ -1,6 +1,6 @@
 # Linear Exact Repair Schemes for Reed–Solomon Codes
 
-## Gröbner-Basis Approach with Two Fixed Entries per Helper Vector
+## Hybrid Approach with Two Fixed Entries per Helper Vector
 
 This directory contains a distributed Magma implementation for searching for **linear exact repair schemes (LERSs)** for Reed–Solomon codes via Gröbner approach.
 
@@ -10,7 +10,7 @@ The implementation supports computations on a Slurm cluster and includes scripts
 
 ## 1. Mathematical Background
 
-Let $K=\mathbb{F}_q$ and $F=\mathbb{F}_{q^t}$, and consider an $[n,k]$ Reed–Solomon code $C$ over $F$.
+Let $K=\mathbb{F}_q$ and $F=\mathbb{F}_{q^t}$, and consider a $[n,k]$ Reed–Solomon code $C$ over $F$.
 We study linear exact repair of the first code coordinate using information downloaded from the remaining $n-1$ coordinates. A repair scheme can be described using $t$ dual codewords, represented as the rows of a matrix $H\in F^{t\times n}$.
 The corresponding base-field representation consists of $t\times t$ blocks,
 $$
