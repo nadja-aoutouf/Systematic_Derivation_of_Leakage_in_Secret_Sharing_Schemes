@@ -22,13 +22,7 @@ where:
 - $I_t$ is the normalized block corresponding to the erased coordinate.
 - The next $l$ blocks are prescribed to be zero.
 - Every remaining helper block has rank at most one over $K$.
-Each nonzero helper block is parameterized as $A_j=u_jv_j$, with
-
-$$
-u_j\in K^{t\times 1},
-\qquad
-v_j\in K^{1\times t}.
-$$
+Each nonzero helper block is parameterized as $A_j=u_jv_j$, with $u_j\in K^{t\times 1},\qquadv_j\in K^{1\times t}.$
 
 This rank-one structure ensures that each corresponding helper contributes at most one base-field symbol to the repair process.
 
@@ -36,6 +30,7 @@ This rank-one structure ensures that each corresponding helper contributes at mo
 ### Fixing the First Two Entries
 
 To reduce the number of polynomial variables, the first two entries of every helper vector $u_j$ are fixed:
+
 $$
 u\_j=
 \begin{pmatrix}
@@ -47,6 +42,7 @@ u\_{j,t}
 \end{pmatrix},
 \qquad a\_j,b\_j\in K.
 $$
+
 The remaining entries of $u_j$, together with all entries of $v_j$, are treated as polynomial variables.
 For $n-1-l$ nonzero helper blocks, this gives $2(n-1-l)$ fixed entries, with $q^{2(n-1-l)}$ possible assignments before filtering.
 The manager enumerates these assignments, while the workers solve the corresponding polynomial systems.
@@ -57,14 +53,8 @@ The main function is
 ```magma
 SetOfAllDualCodewords(q, t, k, n, l, list);
 ```
-It constructs a symbolic repair matrix and encodes the dual-code orthogonality conditions. Let $G\in F^{k\times n}$ be the Reed–Solomon generator matrix. The required condition is
-$$
-GH^\top=0.
-$$
-Using a basis of $F$ over $K$, these extension-field equations are expanded into polynomial equations over $K$. To restrict the variables to the base field, the system also includes
-$$
-x^q-x=0
-$$
+It constructs a symbolic repair matrix and encodes the dual-code orthogonality conditions. Let $G\in F^{k\times n}$ be the Reed–Solomon generator matrix. The required condition is $GH^\top=0.$
+Using a basis of $F$ over $K$, these extension-field equations are expanded into polynomial equations over $K$. To restrict the variables to the base field, the system also includes $x^q-x=0$
 for each polynomial variable $x$.
 
 ### Resultants and Gröbner bases
