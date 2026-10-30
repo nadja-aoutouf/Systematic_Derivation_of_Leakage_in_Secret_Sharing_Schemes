@@ -100,7 +100,6 @@ run_worker () {
 
     # Run MAGMA
     magma -b "$WORKER_SCRIPT" > "$log_file" 2>&1
-
 }
 
 # Launch workers in parallel

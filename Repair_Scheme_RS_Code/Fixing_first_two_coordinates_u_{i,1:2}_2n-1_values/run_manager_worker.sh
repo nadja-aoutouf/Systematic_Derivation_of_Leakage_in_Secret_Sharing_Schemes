@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=algebra
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=256
 
 # ============================================================
 # Launch Distributed Reed-Solomon Repair Scheme Computations
