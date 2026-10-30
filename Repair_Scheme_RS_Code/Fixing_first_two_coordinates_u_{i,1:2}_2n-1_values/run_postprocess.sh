@@ -1,11 +1,26 @@
 #!/bin/bash
 
+# ============================================================
+# Postprocessing Launcher for Distributed RS Repair Computations
+# ============================================================
+# Usage:
+#   bash run_postprocess.sh <job_directory>
+#
+# Description:
+#   Identifies completed task output files, records tasks with missing output files, and launches the Magma postprocessor.
+#
+# Output:
+#   <job_directory>/task_list.txt
+#   <job_directory>/task_uncompleted.txt
+#   <job_directory>/summary_table.tex
+#   <job_directory>/all_solutions.mag (if solutions exist)
+# ============================================================
+
 # Check if job folder name is provided
 if [ -z "$1" ]; then
     echo "Usage: $0 <Job folder name>"
     exit 1
 fi
-
 job_folder=$1
 
 # Ensure that the job folder exists
@@ -18,9 +33,8 @@ fi
 echo "Navigating to job folder: $job_folder"
 cd "$job_folder" || { echo "Failed to enter job folder"; exit 1; }
 
-# --- Generate task_list.txt with only finished tasks ---
+# Generate task_list.txt with only finished tasks
 echo "Generating task list..."
-
 # Empty the files first
 > task_list.txt
 > task_uncompleted.txt

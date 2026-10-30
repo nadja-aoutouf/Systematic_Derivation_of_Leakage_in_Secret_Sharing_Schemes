@@ -1,26 +1,63 @@
 #!/usr/bin/env bash
+
+# ============================================================
+# Worker Launcher for Distributed RS Repair Computations
+# ============================================================
+#
+# Description:
+#   Launches multiple Magma worker processes for a batch of repair scheme computations.
+#   Each worker connects to the manager through Magma's MonitoredDistributedWorker interface.
+#
+#   The script:
+#     1. Reads parameters from parameters.mag.
+#     2. Creates or reuses the job directory.
+#     3. Generates a worker-specific Magma script.
+#     4. Assigns a unique worker identifier.
+#     5. Launches workers concurrently.
+#     6. Records worker logs and wall-clock execution time.
+#
+# Configuration:
+#   MAX : Maximum number of worker processes. Default: 256.
+#
+# Dependencies:
+#   - parameters.mag
+#   - worker.mag
+#   - repair_scheme_solver.mag
+#   - Magma
+#
+# Output:
+#   Job_<parameters>_<timestamp>/
+#       worker-1.mag
+#       worker-1.log
+#       worker-2.mag
+#       worker-2.log
+#       ...
+#       data_job.txt
+#
+# Usage:
+#   This script is launched by manager.mag.
+#
+# ============================================================
+
 set -euo pipefail
-
 MAX="${MAX:-256}"               # number of workers
-CMDLINE="${CMDLINE:-magma -b worker.mag}"
 
-
-# --- read parameters from parameters.mag into bash vars ---
+# =====================================================
+# read parameters from parameters.mag (same trick you used in run_worker.sh): 
+# extracts q, t, k, n, l, and port_num into shell variables.
+# =====================================================
 eval "$(
   sed -E 's://.*$::' parameters.mag \
   | sed -En 's/^[[:space:]]*([A-Za-z0-9_]+)[[:space:]]*:=[[:space:]]*([^;]+);[[:space:]]*$/\1="\2"/p'
 )"
-
-
 echo "Read parameters: q=$q t=$t k=$k n=$n l=$l port_num=$port_num"
-
 
 # Path to original MAGMA script
 MAGMA_SCRIPT="worker.mag"
 
-# Create or reuse a job folder
-# --- choose a job folder and reuse it across batches ---
-
+# =====================================================
+# creates/chooses a job folder and reuse it across batches
+# =====================================================
 # If we already saved a job folder name, use it here -f checks if the path exist to a file and -s if the file is non-empty
 job_folder_name="job_folder.${SLURM_JOB_ID:-$$}.txt"   # to have a unique name per job
 
@@ -38,13 +75,6 @@ mkdir -p "$JOBDIR"
 if [ ! -f "$JOBDIR/data_job.txt" ]; then
   echo "Number of workers: $MAX" > "$JOBDIR/data_job.txt"
 fi
-
-# old version
-#JOBDIR="Job_q${q}_t${t}_n${n}_k${k}_$(date +%Y%m%d_%H%M%S)"
-#mkdir -p "$JOBDIR"
-# --- Create a folder data_job.txt inwhich the number of workers and the wall-clock time is saved ---
-#echo "Number of workers: $MAX" > "$JOBDIR/data_job.txt"
-
 
 # helper: format seconds
 fmt_dur () {
@@ -73,16 +103,11 @@ run_worker () {
 
 }
 
-
-
-
-
 # Launch workers in parallel
 for i in $(seq 1 $MAX); do
     run_worker $i &
 done
 wait
-
 
 # to end measuring the time to get the wall-clock time 
 end=$(date +%s)
@@ -90,8 +115,6 @@ wall_clock_time=$((end - start))
 {
   echo "Wall-Clock time is: $(fmt_dur $wall_clock_time) (${wall_clock_time}s)"
 } >> "$JOBDIR/data_job.txt"
-
-
 
 echo "All workers finished. Logs are in $JOBDIR"
 

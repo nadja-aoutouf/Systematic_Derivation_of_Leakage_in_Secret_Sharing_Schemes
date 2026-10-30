@@ -1,17 +1,40 @@
-// builds a LaTeX summary table and collects unique solutions
-// Files created (inside job_folder):
-//   - summary_table.tex
-//   - all_solutions.mag   (list of unique solutions_over_F across all tasks)
+///////////////////////////////////////////////////////////////////////
+// Postprocessing of Distributed RS Repair Scheme Computations
+///////////////////////////////////////////////////////////////////////
+//
+// Description:
+//   Aggregates the results of distributed computations for Reed-Solomon repair schemes.
+//   The script reads serialized results from individual task directories, constructs a LaTeX summary table,
+//   and collects distinct repair matrices over GF(q^t).
+//
+// Input:
+//   job_folder.txt : Path to the job directory.
+//   task_list.txt  : List of task directories to process.
+//   Each task directory is expected to contain: objects.mag : Serialized task data and solutions.
+// Output:
+//      summary_table.tex : LaTeX table containing:  - Task identifier
+//                                                   - Fixed-variable assignment
+//                                                   - Number of zeros in the assignment
+//                                                   - Number of solutions
+//                                                   - Number of distinct repair matrices per task
+//      all_solutions.mag : Serialized sequence of globally distinct repair matrices.
+//
+// Dependencies:
+//   - Magma
+//   - Completed worker output files
+//
+// Notes:
+//   - Duplicate solutions (a.k.a repair matrices) across tasks are removed.
+//   - The global solution file is created only if at least one repair matrix was found.
+///////////////////////////////////////////////////////////////////////
 
-// Get current Job folder that we want to post process
-// Read the job folder from the temporary file
+// Get current Job folder that we want to post process: Read the job folder from the temporary file
 job_folder := Trim(Read("job_folder.txt"));
 
 // Helper function to count zeros in a list/sequence
 function CountZeros(vec)
     return #[ x : x in vec | x eq 0 ];
 end function;
-
 
 // Path to task list file
 task_list_file := Sprintf("%o/task_list.txt", job_folder);
@@ -23,12 +46,6 @@ raw := Read(task_list_file);
 lines := Split(raw, "\n");
 task_dirs := [ Trim(line) : line in lines | line ne "" ];
 
-
-// Create a file to write down all unfinished tasks
-not_finished_file := Sprintf("%o/not_finished.txt", job_folder);
-nf := Open(not_finished_file, "w");
-
-
 // Prepare LaTeX table header
 latex := [
     "\\begin{tabular}{|c|c|c|c|c|}",
@@ -37,16 +54,12 @@ latex := [
     "\\hline"
 ];
 
-
-
 // Collect all solutions_over_F here, then deduplicate via Set
 all_solutions := [];
-
 // Iterate tasks
 for task_dir in task_dirs do
     task_path := Sprintf("%o/%o", job_folder, task_dir);
     object_file := Sprintf("%o/objects.mag", task_path);
-
 
     // Open and read the four objects if its exists
     f := Open(object_file, "read");
@@ -55,7 +68,6 @@ for task_dir in task_dirs do
     solutions_u_v     := ReadObject(f);
     solutions_over_F  := ReadObject(f);
     delete f;
-
 
     // Extract info for the table (with assigned checks)
     num_zeros := (assigned input_vector) select CountZeros(input_vector) else 0;
@@ -74,9 +86,6 @@ for task_dir in task_dirs do
         all_solutions := all_solutions cat solutions_over_F;
     end if;
 end for;
-
-delete nf;
-print Sprintf("Not-finished tasks logged to %o", not_finished_file);
 
 // Finish LaTeX table and write it out
 Append(~latex, "\\end{tabular}");
@@ -98,7 +107,6 @@ if #all_solutions gt 0 then
     // Store as a single list object for easy ReadObject later
     WriteObject(gf, unique_solutions);
     delete gf;
-
     print Sprintf("All (unique) solutions written to %o", out_all);
 else
     print "No solutions_over_F found; not creating all_solutions.mag.";
