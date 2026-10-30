@@ -22,9 +22,9 @@ where:
 - Every remaining helper block has rank at most one over $K$.
 Each nonzero helper block is parameterized as $A_j=u_jv_j$, with
 $$
-u\_j\in K^{t\times 1},
+u\_j\in K\^{t\times 1},
 \qquad
-v\_j\in K^{1\times t}.
+v\_j\in K\^{1\times t}.
 $$
 This rank-one structure ensures that each corresponding helper contributes at most one base-field symbol to the repair process.
 
