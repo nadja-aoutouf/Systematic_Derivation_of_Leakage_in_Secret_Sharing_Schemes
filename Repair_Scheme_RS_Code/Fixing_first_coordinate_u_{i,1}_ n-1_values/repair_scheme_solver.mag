@@ -1,0 +1,206 @@
+///////////////////////////////////////////////////////////////////////////
+// 
+// Strategy: Fix the first entry of each helper vector u_j.
+//
+// DESCRIPTION:
+//   Constructs linear exact repair schemes for an [n,k] Reed–Solomon code over F = GF(q^t), using t codewords from its dual code.
+//   The erased coordinate is normalized to the identity block I_t. The next l helper blocks are prescribed to be zero.
+//   Each remaining helper block has the form: A_j = u_j * v_j, where u_j is a t x 1 column vector and v_j is a 1 x t row vector
+//   over K = GF(q).
+//
+//   The first entry of each u_j is fixed by the input list, while the remaining entries of u_j and all entries of v_j are unknowns.
+//
+//   The function constructs polynomial equations encoding dual-code
+//   orthogonality, adds base-field equations, and computes the variety of the resulting ideal.
+//
+// INPUT:
+//   q    : Size of the base field K = GF(q).
+//   t    : Extension degree, F = GF(q^t).
+//   k    : Dimension of the Reed–Solomon code.
+//   n    : Length of the Reed–Solomon code.
+//   l    : Number of prescribed zero helper blocks.
+//   list : Sequence of n-1-l fixed first entries of the vectors u_j.
+//
+// OUTPUT:
+//   has_solution     : Boolean indicating whether solutions were found.
+//   solutions_over_F : Sequence of t x n matrices over F whose rows
+//                      are dual codewords.
+//   solutions_u_v    : Variety of the polynomial system over K.
+//
+// NOTES:
+//   - Evaluation points are 0, 1, a, ..., a^(n-2), where a generates F*.
+//   - Every nonzero helper block has rank at most one over K.
+//   - The polynomial system includes field equations: x^q - x = 0 for each variable.
+///////////////////////////////////////////////////////////////////////////
+
+SetOfAllDualCodewords := function(q,t,k,n,l , list)
+
+	// =====================================================
+	// Define the set up
+	// =====================================================
+	K := GF(q); // Base field
+	F := GF(q^t); // Finite field GF(q^t);
+	a := Generator(F);
+
+	zeta := [a^i : i in [0..t-1]]; // basis 'zeta' of F over K
+	my_min_poly := MinimalPolynomial(a); // get the minimal polynomial 
+	evaluation_points := [F!0] cat [F | a^i : i in [0..n-2] ]; // Define evaluation points
+
+	// =====================================================
+	// Define the polynomial ring over K
+	// =====================================================
+	// Define variables for the polynomial ring R1
+	v_vars := [ Sprintf("v_%o_%o", i, j) : j in [1..t] , i in [2+l..n]];
+	u_vars := [ Sprintf("u_%o_%o", i, j) : j in [2..t] ,  i in [2+l..n] ];
+
+	R1 := PolynomialRing(K, #v_vars + #u_vars); // Create the polynomial ring with sets of variables
+	AssignNames(~R1, v_vars cat u_vars); // First polynomial ring K[R121,…,Rtnt] 
+
+	// the variables are accessible as generators of R1
+	v_vars_poly := [ R1.i : i in [1..#v_vars ] ];
+	u_vars_poly := [ R1.i : i in [#v_vars + 1..#v_vars + #u_vars] ];
+
+	// =====================================================
+	// Define the matrix A over K which should include all the t codewords in F written over K
+	// =====================================================
+	// Construct matrix A by horizontally concatenating t×t blocks
+	blocks := [];
+
+	// First block is the identity matrix
+	Append(~blocks, IdentityMatrix(R1, t));
+
+	// Second zero block is the zero matrix
+    for i in [1..l] do 
+	    Append(~blocks, ZeroMatrix(R1, t, t));
+    end for;
+
+	// Other blocks are v_j * u_j
+	for j in [2+l..n] do
+	    u_j := Matrix(R1, t, 1, [R1!list[j-1-l]] cat [ R1.(#v_vars + (t-1)*(j-2-l)+s) : s in [1..t-1] ]);
+	    v_j := Matrix(R1, 1, t, [ R1.(t*(j-2-l)+s) : s in [1..t] ]);
+	    prod := u_j * v_j; // Result is t × t
+	    submatrix := Matrix(R1, t, t, Eltseq(prod));
+	    Append(~blocks, submatrix);
+	end for;
+
+	// Join all t × t blocks into one t × (n·t) matrix
+	A := HorizontalJoin(blocks);
+
+	// =====================================================
+	// Define the generator matrix of RS(n,k) over K
+	// =====================================================
+
+	// Define the RS generator matrix over F
+	G_F := Matrix(F, k, n, [ evaluation_points[j]^(i-1) :  j in [1..n], i in [1..k] ]);
+
+	// Convert generator matrix entries to coordinates over K
+	// Each element in F is represented as a t-dimensional vector over K
+	// Final matrix will be k x (n * t) over K
+
+	// Multiplication table of F
+	MultTable := [ [Eltseq(zeta[i] * zeta[j]) : j in [1..t]] : i in [1..t] ];
+
+	// Now simulate multiplication
+	Equations := [];
+	for i in [1..k] do
+	    for s in [1..t] do
+		Eq := [R1!0 : w in [1..t]];
+		for j in [1..n] do
+		    g_coords := Eltseq(G_F[i,j]);
+		    a_coords := [ A[s][ (j-1)*t + v ] : v in [1..t] ];
+		    for u in [1..t] do
+		        for v in [1..t] do
+		            prod := MultTable[u][v];
+		            for w in [1..t] do
+		                Eq[w] +:= g_coords[u] * a_coords[v] * prod[w];
+		            end for;
+		        end for;
+		    end for;
+		end for;
+		Append(~Equations, Eq);
+	    end for;
+	end for;
+
+	// Extract t rows/codewords as 1 x (t*n) submatrices
+	codewords_of_A  := [ Submatrix(A, i, 1, 1, t*n) : i in [1..t] ];
+
+	M_gen_list := [];
+	for i in [1..t*k] do
+	    M_gen_list := M_gen_list cat Equations[i];
+	end for;
+	M_gen := Matrix(R1, #M_gen_list, 1, M_gen_list);
+
+	// Construct the corresponding zero matrix 
+	S_gen := Matrix(R1,  #M_gen_list, 1, [0: i in [1.. #M_gen_list]]);
+
+	// =====================================================
+	// Add field equations
+	// =====================================================
+
+	field_eqns := [ R1.i^q - R1.i : i in [1..#v_vars + #u_vars] ];
+	M_field_eq :=  Matrix(R1, #field_eqns , 1, field_eqns);
+	S_field_eq :=  Matrix(R1, #field_eqns , 1, [0 : i in [1..#field_eqns]]);
+
+	// =====================================================
+	// Build up the new system M=S over the base field that contains all equations
+	// =====================================================
+	seqM := Eltseq(M_field_eq) cat Eltseq(M_gen);
+	M := Matrix(R1, #seqM, 1, seqM);
+
+	seqS := Eltseq(S_field_eq) cat Eltseq(S_gen);
+	S := Matrix(R1, #seqS, 1, seqS);
+
+	// =====================================================
+	// Solve the system M=S over R1
+	// =====================================================
+	A_sol := M - S;
+	M_entries := Eltseq(A_sol);
+	M_entries1:=[R1!x : x in M_entries];
+	R_flat := R1;
+	I := ideal<R_flat | M_entries1>;
+
+	// Check if the ideal is zero-dimensional and compute variety only then
+	dim := Dimension(I);
+	if dim gt 0 then
+		return false, [], [];
+	end if;
+
+	V := Variety(I);
+	if #V eq 0 then
+		return false, [], [];
+	end if;
+
+	// Evaluate matrix A at each solution point
+	A_evaluated := [Matrix(K, t, t*n, [Evaluate(entry, v) : entry in Eltseq(A)]): v in V];
+	UniqueA := {@ A : A in A_evaluated @};
+
+	// Convert each t-dimensional block over K back to F using the basis zeta = [1, a, ..., a^(t-1)].
+	ConvertRowFromBits := func< bits | [F!Eltseq(Polynomial(K, bits[(i-1)*t+1 .. i*t])) : i in [1 .. #bits div t]] >;
+
+	// Convert a list of rows over K into a matrix over F.
+	ConvertListOfRows := function(row_list, t)
+	    return Matrix(F, [ConvertRowFromBits(row) : row in row_list]);
+	end function;
+
+	row_lists := [[Eltseq(r) : r in Rows(sol)]: sol in UniqueA];
+	UniqueA_converted := [ConvertListOfRows(row_list, t): row_list in row_lists];
+
+	// Check if codewords are duals 
+	is_valid := true;
+	for i in [1..#row_lists] do
+		AF := ConvertListOfRows(row_lists[i], t);
+		Prod := G_F * Transpose(AF);
+		if not forall{x : x in Eltseq(Prod) | x eq 0} then
+			is_valid := false;
+			break;
+		end if;
+	end for;
+
+	if not is_valid then
+		return false, [],  [];
+	end if;
+
+	return true, UniqueA_converted, V;
+
+end function;
+

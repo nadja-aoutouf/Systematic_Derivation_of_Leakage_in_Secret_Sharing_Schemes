@@ -1,0 +1,106 @@
+// builds a LaTeX summary table and collects unique solutions
+// Files created (inside job_folder):
+//   - summary_table.tex
+//   - all_solutions.mag   (list of unique solutions_over_F across all tasks)
+
+// Get current Job folder that we want to post process
+// Read the job folder from the temporary file
+job_folder := Trim(Read("job_folder.txt"));
+
+// Helper function to count zeros in a list/sequence
+function CountZeros(vec)
+    return #[ x : x in vec | x eq 0 ];
+end function;
+
+
+// Path to task list file
+task_list_file := Sprintf("%o/task_list.txt", job_folder);
+
+// Read the task list file as one big string
+raw := Read(task_list_file);
+
+// Now split into lines and clean them
+lines := Split(raw, "\n");
+task_dirs := [ Trim(line) : line in lines | line ne "" ];
+
+
+// Create a file to write down all unfinished tasks
+not_finished_file := Sprintf("%o/not_finished.txt", job_folder);
+nf := Open(not_finished_file, "w");
+
+
+// Prepare LaTeX table header
+latex := [
+    "\\begin{tabular}{|c|c|c|c|c|}",
+    "\\hline",
+    "Task & u_i values & \\#zeros & \\#Var & \\#sol \\\\",
+    "\\hline"
+];
+
+
+
+// Collect all solutions_over_F here, then deduplicate via Set
+all_solutions := [];
+
+// Iterate tasks
+for task_dir in task_dirs do
+    task_path := Sprintf("%o/%o", job_folder, task_dir);
+    object_file := Sprintf("%o/objects.mag", task_path);
+
+
+    // Open and read the four objects if its exists
+    f := Open(object_file, "read");
+    task_number       := ReadObject(f);
+    input_vector      := ReadObject(f);
+    solutions_u_v     := ReadObject(f);
+    solutions_over_F  := ReadObject(f);
+    delete f;
+
+
+    // Extract info for the table (with assigned checks)
+    num_zeros := (assigned input_vector) select CountZeros(input_vector) else 0;
+    num_solutions_over_F := (assigned solutions_over_F) select #solutions_over_F else 0;
+    num_solutions_u_v    := (assigned solutions_u_v) select #solutions_u_v else 0;
+    task_id := assigned task_number select task_number else 0;
+    ui      := assigned input_vector select input_vector else [];
+
+    // Append a row to the LaTeX table
+    Append(~latex, Sprintf("%o & %o & %o & %o & %o \\\\",
+        task_id, ui, num_zeros, num_solutions_u_v, num_solutions_over_F));
+    Append(~latex, "\\hline");
+
+    // Accumulate solutions_over_F if nonempty
+    if assigned solutions_over_F and #solutions_over_F gt 0 then
+        all_solutions := all_solutions cat solutions_over_F;
+    end if;
+end for;
+
+delete nf;
+print Sprintf("Not-finished tasks logged to %o", not_finished_file);
+
+// Finish LaTeX table and write it out
+Append(~latex, "\\end{tabular}");
+out_tex := Sprintf("%o/summary_table.tex", job_folder);
+tf := Open(out_tex, "w");
+for line in latex do
+    fprintf tf, "%o\n", line;
+end for;
+delete tf;
+print Sprintf("LaTeX table written to %o", out_tex);
+
+// Deduplicate all_solutions via Set 
+if #all_solutions gt 0 then
+    // Convert to set and back to a sequence (removes duplicates)
+    unique_solutions := Setseq(Set(all_solutions));
+
+    out_all := Sprintf("%o/all_solutions.mag", job_folder);
+    gf := Open(out_all, "w");
+    // Store as a single list object for easy ReadObject later
+    WriteObject(gf, unique_solutions);
+    delete gf;
+
+    print Sprintf("All (unique) solutions written to %o", out_all);
+else
+    print "No solutions_over_F found; not creating all_solutions.mag.";
+end if;
+

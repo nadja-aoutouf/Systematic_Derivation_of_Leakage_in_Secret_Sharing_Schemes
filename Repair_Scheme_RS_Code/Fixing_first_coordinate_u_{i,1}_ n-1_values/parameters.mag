@@ -1,0 +1,34 @@
+// ============================================================
+// Configuration for Distributed RS Repair Scheme Computations
+// ============================================================
+//
+// This file defines the parameters used by the manager–worker
+// architecture for computing linear exact repair schemes (LERSs)
+// of Reed–Solomon codes via Gröbner approach.
+//
+// Variable-fixing strategy:
+//   Fixing n-1 values.
+//
+// ============================================================
+
+// ------------------------------------------------------------
+// Code parameters
+// ------------------------------------------------------------
+
+q := 2;    // Base field size: GF(q)
+t := 5;    // Extension degree: GF(q^t) over GF(q)
+k := 5;    // Dimension of the Reed–Solomon code
+n := 14;   // Code length (n <= q^t)
+
+// ------------------------------------------------------------
+// Repair scheme parameters
+// ------------------------------------------------------------
+
+l := 0;    // Number of forced zero columns in the repair matrix
+
+// ------------------------------------------------------------
+// Distributed computation parameters
+// ------------------------------------------------------------
+
+port_num := 21000;  // Port used for manager–worker communication. Valid range: 1024–65535
+

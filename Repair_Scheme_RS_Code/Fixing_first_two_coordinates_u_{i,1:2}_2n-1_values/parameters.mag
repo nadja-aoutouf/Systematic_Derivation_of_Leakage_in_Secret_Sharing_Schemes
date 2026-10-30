@@ -7,7 +7,7 @@
 // of Reed–Solomon codes via Gröbner approach.
 //
 // Variable-fixing strategy:
-//   Fixing 2n-1 values.
+//   Fixing 2(n-1) values.
 //
 // ============================================================
 
