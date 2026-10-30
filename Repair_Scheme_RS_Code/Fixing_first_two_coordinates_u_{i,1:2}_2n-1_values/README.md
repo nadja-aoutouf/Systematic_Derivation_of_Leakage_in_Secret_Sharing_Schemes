@@ -13,19 +13,23 @@ The implementation supports computations on a Slurm cluster and includes scripts
 Let $K=\mathbb{F}\_q$ and $F=\mathbb{F}\_{q^t}$, and consider a $[n,k]$ Reed–Solomon code $C$ over $F$.
 We study linear exact repair of the first code coordinate using information downloaded from the remaining $n-1$ coordinates. A repair scheme can be described using $t$ dual codewords, represented as the rows of a matrix $H\in F^{t\times n}$.
 The corresponding base-field representation consists of $t\times t$ blocks,
+
 $$
 A=[I_t\mid 0\mid\cdots\mid 0\mid A_{l+2}\mid\cdots\mid A_n],
 $$
+
 where:
 - $I_t$ is the normalized block corresponding to the erased coordinate.
 - The next $l$ blocks are prescribed to be zero.
 - Every remaining helper block has rank at most one over $K$.
 Each nonzero helper block is parameterized as $A_j=u_jv_j$, with
+
 $$
 u_j\in K^{t\times 1},
 \qquad
 v_j\in K^{1\times t}.
 $$
+
 This rank-one structure ensures that each corresponding helper contributes at most one base-field symbol to the repair process.
 
 
