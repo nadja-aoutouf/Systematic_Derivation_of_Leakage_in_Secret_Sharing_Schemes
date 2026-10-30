@@ -10,29 +10,29 @@ The implementation supports computations on a Slurm cluster and includes scripts
 
 ## 1. Mathematical Background
 
-Let \(K=\mathbb F_q,\qquad F=\mathbb F_{q^t},\) and consider an \([n,k]\) Reed–Solomon code \(C\) over \(F\).
-We study linear exact repair of the first code coordinate using information downloaded from the remaining \(n-1\) coordinates.
-A repair scheme can be described using \(t\) dual codewords, represented as the rows of a matrix \(H\in F^{t\times n}.\)
-The corresponding base-field representation consists of \(t\times t\) blocks,
-\[
+Let $K=\mathbb{F}_q$ and $F=\mathbb{F}_{q^t}$, and consider an $[n,k]$ Reed–Solomon code $C$ over $F$.
+We study linear exact repair of the first code coordinate using information downloaded from the remaining $n-1$ coordinates. A repair scheme can be described using $t$ dual codewords, represented as the rows of a matrix $H\in F^{t\times n}$.
+The corresponding base-field representation consists of $t\times t$ blocks,
+$$
 A=[I_t\mid 0\mid\cdots\mid 0\mid A_{l+2}\mid\cdots\mid A_n],
-\]
+$$
 where:
-- \(I_t\) is the normalized block corresponding to the erased coordinate.
-- The next \(l\) blocks are prescribed to be zero.
-- Every remaining helper block has rank at most one over \(K\).
-Each nonzero helper block is parameterized as \(A_j=u_jv_j,\) with
-\[
-u_j\in K^{t\times1},
+- $I_t$ is the normalized block corresponding to the erased coordinate.
+- The next $l$ blocks are prescribed to be zero.
+- Every remaining helper block has rank at most one over $K$.
+Each nonzero helper block is parameterized as $A_j=u_jv_j$, with
+$$
+u_j\in K^{t\times 1},
 \qquad
 v_j\in K^{1\times t}.
-\]
+$$
 This rank-one structure ensures that each corresponding helper contributes at most one base-field symbol to the repair process.
 
-### Fixing the first two entries
 
-To reduce the number of polynomial variables, the first two entries of every helper vector \(u_j\) are fixed:
-\[
+### Fixing the First Two Entries
+
+To reduce the number of polynomial variables, the first two entries of every helper vector $u_j$ are fixed:
+$$
 u_j=
 \begin{pmatrix}
 a_j\\
@@ -42,9 +42,10 @@ u_{j,3}\\
 u_{j,t}
 \end{pmatrix},
 \qquad a_j,b_j\in K.
-\]
-The remaining entries of \(u_j\), together with all entries of \(v_j\), are treated as polynomial variables.
-For \(n-1-l\) nonzero helper blocks, this gives \(2(n-1-l)\) fixed entries, with \(q^{2(n-1-l)}\) possible assignments before filtering. The manager enumerates these assignments, while the workers solve the corresponding polynomial systems.
+$$
+The remaining entries of $u_j$, together with all entries of $v_j$, are treated as polynomial variables.
+For $n-1-l$ nonzero helper blocks, this gives $2(n-1-l)$ fixed entries, with $q^{2(n-1-l)}$ possible assignments before filtering.
+The manager enumerates these assignments, while the workers solve the corresponding polynomial systems.
 
 ## 2. Polynomial-System Construction
 
@@ -52,21 +53,15 @@ The main function is
 ```magma
 SetOfAllDualCodewords(q, t, k, n, l, list);
 ```
-It constructs a symbolic repair matrix and encodes the dual-code orthogonality conditions.
-Let \(G\in F^{k\times n}\) be the Reed–Solomon generator matrix. The required condition is
-\[
+It constructs a symbolic repair matrix and encodes the dual-code orthogonality conditions. Let $G\in F^{k\times n}$ be the Reed–Solomon generator matrix. The required condition is
+$$
 GH^\top=0.
-\]
-
-Using a basis of \(F\) over \(K\), these extension-field equations are expanded into polynomial equations over \(K\).
-
-To restrict the variables to the base field, the system also includes
-
-\[
+$$
+Using a basis of $F$ over $K$, these extension-field equations are expanded into polynomial equations over $K$. To restrict the variables to the base field, the system also includes
+$$
 x^q-x=0
-\]
-
-for each polynomial variable \(x\).
+$$
+for each polynomial variable $x$.
 
 ### Resultants and Gröbner bases
 
@@ -79,7 +74,7 @@ The resulting matrices are converted back into extension-field representations, 
 The solver returns:
 
 - A Boolean indicating whether verified solutions were obtained.
-- A sequence of distinct repair matrices over \(F\).
+- A sequence of distinct repair matrices over $F$.
 - The variety of the polynomial system.
 
 A `false` result does not necessarily establish mathematical nonexistence, since the solver also returns `false` for positive-dimensional ideals.
@@ -125,13 +120,12 @@ run_manager_worker.sh
 
 ### Candidate filtering
 
-For an \([n,k]\) Reed–Solomon code, the dual code has minimum distance \(d(C^\perp)=k+1.\])
-Therefore, a nonzero dual codeword has at most \(n-k-1\) zero coordinates.
-The manager uses this necessary condition to filter candidate assignments before dispatching them.
+
+For an $[n,k]$ Reed–Solomon code, the dual code has minimum distance $d(C^\perp)=k+1$. Therefore, a nonzero dual codeword has at most $n-k-1$ zero coordinates. The manager uses this necessary condition to filter candidate assignments before dispatching them.
 
 ### Batching and parallelism
 
-Accepted task identifiers are grouped into batches of at most \(2^{13}=8192\) tasks.
+Accepted task identifiers are grouped into batches of at most $2^{13}=8192$ tasks.
 The worker launcher starts multiple Magma processes, with the number controlled by the environment variable `MAX` (default: 256).
 Each batch uses a separate communication port.
 The number of worker processes should be chosen according to the available CPU and memory resources.
@@ -177,11 +171,8 @@ l := 0;    // Number of prescribed zero helper blocks
 port_num := 2003; // Base communication port
 ```
 
-This defines an \([14,6]\) Reed–Solomon code over \(\mathbb F_{16}\).
 
-The solver requires \(t\geq2\), a valid prime-power field size \(q\), and a code length compatible with the available distinct evaluation points.
-
-For this configuration, the manager considers a search space of \(2^{26}=67,108,864\) candidate assignments before filtering.
+This defines a $[14,6]$ Reed–Solomon code over $\mathbb{F}_{16}$. The solver requires $t\geq 2$, a valid prime-power field size $q$, and a code length compatible with the available distinct evaluation points. For this configuration, the manager considers a search space of $2^{26}=67,108,864$ candidate assignments before filtering.
 
 ## 6. Requirements
 
