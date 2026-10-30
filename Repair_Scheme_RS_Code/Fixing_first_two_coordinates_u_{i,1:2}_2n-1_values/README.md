@@ -10,11 +10,11 @@ The implementation supports computations on a Slurm cluster and includes scripts
 
 ## 1. Mathematical Background
 
-Let $K=\mathbb{F}\_q$ and $F=\mathbb{F}_{q^t}$, and consider a $[n,k]$ Reed–Solomon code $C$ over $F$.
+Let $K=\mathbb{F}\_q$ and $F=\mathbb{F}\_{q^t}$, and consider a $[n,k]$ Reed–Solomon code $C$ over $F$.
 We study linear exact repair of the first code coordinate using information downloaded from the remaining $n-1$ coordinates. A repair scheme can be described using $t$ dual codewords, represented as the rows of a matrix $H\in F^{t\times n}$.
 The corresponding base-field representation consists of $t\times t$ blocks,
 $$
-A=[I_t\mid 0\mid\cdots\mid 0\mid A_{l+2}\mid\cdots\mid A_n],
+A=[I\_t\mid 0\mid\cdots\mid 0\mid A\_{l+2}\mid\cdots\mid A\_n],
 $$
 where:
 - $I_t$ is the normalized block corresponding to the erased coordinate.
@@ -22,9 +22,9 @@ where:
 - Every remaining helper block has rank at most one over $K$.
 Each nonzero helper block is parameterized as $A_j=u_jv_j$, with
 $$
-u_j\in K^{t\times 1},
+u\_j\in K^{t\times 1},
 \qquad
-v_j\in K^{1\times t}.
+v\_j\in K^{1\times t}.
 $$
 This rank-one structure ensures that each corresponding helper contributes at most one base-field symbol to the repair process.
 
@@ -33,15 +33,15 @@ This rank-one structure ensures that each corresponding helper contributes at mo
 
 To reduce the number of polynomial variables, the first two entries of every helper vector $u_j$ are fixed:
 $$
-u_j=
+u\_j=
 \begin{pmatrix}
-a_j\\
-b_j\\
-u_{j,3}\\
+a\_j\\
+b\_j\\
+u\_{j,3}\\
 \vdots\\
-u_{j,t}
+u\_{j,t}
 \end{pmatrix},
-\qquad a_j,b_j\in K.
+\qquad a\_j,b\_j\in K.
 $$
 The remaining entries of $u_j$, together with all entries of $v_j$, are treated as polynomial variables.
 For $n-1-l$ nonzero helper blocks, this gives $2(n-1-l)$ fixed entries, with $q^{2(n-1-l)}$ possible assignments before filtering.
