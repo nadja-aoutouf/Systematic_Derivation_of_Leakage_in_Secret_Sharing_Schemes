@@ -24,13 +24,7 @@ $$
 
 where $I_t$ is the normalized block corresponding to the erased coordinate.
 
-To construct repair schemes with at most one base-field symbol downloaded from each helper coordinate, we impose
-
-$$
-\operatorname{rank}_K(A_j)\le 1
-$$
-
-for each helper block. These blocks can be parameterized as
+To construct repair schemes with at most one base-field symbol downloaded from each helper coordinate, we impose that the rank for each helper block is at most 1. These blocks can be parameterized as
 
 $$
 A_j=u_jv_j,
