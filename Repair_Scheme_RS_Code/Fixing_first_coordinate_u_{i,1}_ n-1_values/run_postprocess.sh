@@ -1,5 +1,24 @@
 #!/bin/bash
+set -euo pipefail
 
+# ============================================================
+# Postprocessing Launcher for Distributed RS Computations
+# ============================================================
+#
+# This script prepares and launches the postprocessing
+#
+# Variable-fixing strategy: Fix the first entry u_{j,1} of each helper vector u_j.
+#
+# The script:
+#   1. Validates the specified job directory.
+#   2. Identifies completed and incomplete task directories.
+#   3. Generates task_list.txt and task_uncompleted.txt.
+#   4. Passes the job directory to postprocess.mag.
+#   5. Runs Magma to generate the summary and unique solutions.
+#
+# Usage: ./run_postprocess.sh <job_directory>
+#
+# ============================================================
 # Check if job folder name is provided
 if [ -z "$1" ]; then
     echo "Usage: $0 <Job folder name>"

@@ -1,26 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MAX="${MAX:-20}"               # number of workers
+# ============================================================
+# Worker Launcher for Distributed RS Repair Computations
+# ============================================================
+#
+# This script launches parallel Magma workers 
+#
+# Variable-fixing strategy: Fix the first entry u_{j,1} of each helper vector u_j.
+#
+# The script:
+#   1. Reads the computation parameters from parameters.mag.
+#   2. Creates or reuses a job directory across batches.
+#   3. Generates an individual Magma script for each worker.
+#   4. Launches workers in parallel.
+#   5. Records worker logs and wall-clock execution time.
+#
+# The manager invokes this script for each batch.
+# ============================================================
+
+MAX="${MAX:-64}"               # number of workers
 CMDLINE="${CMDLINE:-magma -b worker.mag}"
 
-
-# --- read parameters from parameters.mag into bash vars ---
+# read parameters from parameters.mag into bash vars 
 eval "$(
   sed -E 's://.*$::' parameters.mag \
   | sed -En 's/^[[:space:]]*([A-Za-z0-9_]+)[[:space:]]*:=[[:space:]]*([^;]+);[[:space:]]*$/\1="\2"/p'
 )"
-
-
 echo "Read parameters: q=$q t=$t k=$k n=$n l=$l port_num=$port_num"
-
 
 # Path to original MAGMA script
 MAGMA_SCRIPT="worker.mag"
 
 # Create or reuse a job folder
-# --- choose a job folder and reuse it across batches ---
-
 # If we already saved a job folder name, use it here -f checks if the path exist to a file and -s if the file is non-empty
 job_folder_name="job_folder.${SLURM_JOB_ID:-$$}.txt"   # to have a unique name per job
 
@@ -39,13 +51,6 @@ if [ ! -f "$JOBDIR/data_job.txt" ]; then
   echo "Number of workers: $MAX" > "$JOBDIR/data_job.txt"
 fi
 
-# old version
-#JOBDIR="Job_q${q}_t${t}_n${n}_k${k}_$(date +%Y%m%d_%H%M%S)"
-#mkdir -p "$JOBDIR"
-# --- Create a folder data_job.txt inwhich the number of workers and the wall-clock time is saved ---
-#echo "Number of workers: $MAX" > "$JOBDIR/data_job.txt"
-
-
 # helper: format seconds
 fmt_dur () {
   local s=$1
@@ -54,7 +59,6 @@ fmt_dur () {
 
 # measure the wall-clock time
 start=$(date +%s)
-
 
 # Run one worker
 run_worker () {
@@ -70,12 +74,7 @@ run_worker () {
 
     # Run MAGMA
     magma -b "$WORKER_SCRIPT" > "$log_file" 2>&1
-
 }
-
-
-
-
 
 # Launch workers in parallel
 for i in $(seq 1 $MAX); do
@@ -83,14 +82,11 @@ for i in $(seq 1 $MAX); do
 done
 wait
 
-
 # to end measuring the time to get the wall-clock time 
 end=$(date +%s)
 wall_clock_time=$((end - start))
 {
   echo "Wall-Clock time is: $(fmt_dur $wall_clock_time) (${wall_clock_time}s)"
 } >> "$JOBDIR/data_job.txt"
-
-
 
 echo "All workers finished. Logs are in $JOBDIR"

@@ -1,9 +1,23 @@
-// builds a LaTeX summary table and collects unique solutions
-// Files created (inside job_folder):
-//   - summary_table.tex
-//   - all_solutions.mag   (list of unique solutions_over_F across all tasks)
 
-// Get current Job folder that we want to post process
+// ============================================================
+// Postprocessing for Distributed RS Repair Scheme Computations
+// ============================================================
+// This script processes the results of the distributed search
+//
+// Variable-fixing strategy: Fix the first entry u_{j,1} of each helper vector u_j.
+//
+// The script:
+//   1. Reads the list of task directories.
+//   2. Loads the serialized results of each task.
+//   3. Generates a LaTeX summary table.
+//   4. Collects and deduplicates the repair schemes.
+//
+// Output files (inside the job directory):
+//   - summary_table.tex : LaTeX table of task results.
+//   - all_solutions.mag : Unique repair schemes over GF(q^t).
+//   - not_finished.txt  : Reserved for unfinished-task records.
+// ============================================================
+
 // Read the job folder from the temporary file
 job_folder := Trim(Read("job_folder.txt"));
 
@@ -12,10 +26,8 @@ function CountZeros(vec)
     return #[ x : x in vec | x eq 0 ];
 end function;
 
-
 // Path to task list file
 task_list_file := Sprintf("%o/task_list.txt", job_folder);
-
 // Read the task list file as one big string
 raw := Read(task_list_file);
 
@@ -23,11 +35,9 @@ raw := Read(task_list_file);
 lines := Split(raw, "\n");
 task_dirs := [ Trim(line) : line in lines | line ne "" ];
 
-
 // Create a file to write down all unfinished tasks
 not_finished_file := Sprintf("%o/not_finished.txt", job_folder);
 nf := Open(not_finished_file, "w");
-
 
 // Prepare LaTeX table header
 latex := [
@@ -37,8 +47,6 @@ latex := [
     "\\hline"
 ];
 
-
-
 // Collect all solutions_over_F here, then deduplicate via Set
 all_solutions := [];
 
@@ -47,7 +55,6 @@ for task_dir in task_dirs do
     task_path := Sprintf("%o/%o", job_folder, task_dir);
     object_file := Sprintf("%o/objects.mag", task_path);
 
-
     // Open and read the four objects if its exists
     f := Open(object_file, "read");
     task_number       := ReadObject(f);
@@ -55,7 +62,6 @@ for task_dir in task_dirs do
     solutions_u_v     := ReadObject(f);
     solutions_over_F  := ReadObject(f);
     delete f;
-
 
     // Extract info for the table (with assigned checks)
     num_zeros := (assigned input_vector) select CountZeros(input_vector) else 0;
@@ -98,9 +104,7 @@ if #all_solutions gt 0 then
     // Store as a single list object for easy ReadObject later
     WriteObject(gf, unique_solutions);
     delete gf;
-
     print Sprintf("All (unique) solutions written to %o", out_all);
 else
     print "No solutions_over_F found; not creating all_solutions.mag.";
 end if;
-

@@ -1,25 +1,43 @@
+// ============================================================
+ // Distributed Worker
+ // ============================================================
+ // This script executes individual tasks assigned by the manager
+ // in the distributed search for LERS of Reed–Solomon codes.
+ //
+ // Variable-fixing strategy: Fix the first entry u_{j,1} of each helper vector u_j.
+ //   Each task corresponds to one assignment of n-1-l fixed values over the base field GF(q).
+ //
+ // The worker:
+ //   1. Receives a task index from the distributed manager.
+ //   2. Converts the index into a base-q assignment.
+ //   3. Solves the corresponding polynomial system.
+ //   4. Stores the solutions and computation time.
+ //   5. Returns a summary to the manager.
+ //
+ // The job directory and worker ID are inserted dynamically by the worker-launching shell script.
+ // ============================================================
 load "parameters.mag";
 load "repair_scheme_solver.mag"; // loads the function: SetOfAllDualCodewords(q,t,k,n,l , list)
-host := "localhost";
+host := "localhost"; // Manager–worker communication settings
 port := StringToInteger(Trim(Read("port.txt"))); // read the port chosen by the manager
 len := n - 1 - l;
 
-
-// job_folder and worker_id will be defined at the top of the file
-// The shell script will replace these lines dynamically
-
-
+// ------------------------------------------------------------
+// Helper function
+// ------------------------------------------------------------
+// job_folder and worker_id will be defined at the top of the file. The shell script will replace these lines dynamically
 function int_to_binary_list(num, len, q)
     return [ (num div q^(i-1)) mod q : i in [len..1 by -1] ];
 end function;
 
-
+// ------------------------------------------------------------
+// Worker configuration AND TASK FUNCTION   
+// ------------------------------------------------------------
 // Placeholders (will be replaced by shell)
 job_folder := "JOB_FOLDER_PLACEHOLDER";
 worker_id := WORKER_ID_PLACEHOLDER;
 
 // Define the task function
-//function task(num, worker_id)
 function task(num) // only one argument since it can not take more then one ....
     start_time := Realtime();
     task_folder := Sprintf("%o/Task_%o_%o", job_folder, worker_id, num);
@@ -36,12 +54,10 @@ function task(num) // only one argument since it can not take more then one ....
 
     has_solution, solutions_over_F, solutions_u_v := SetOfAllDualCodewords(q, t, k, n, l, list);
 
-
 	if not has_solution then 
 		solutions_over_F := [];
 		solutions_u_v := [];
 	end if;
-
 
     // add Objects into Object file
     filename := Sprintf("%o/objects.mag", task_folder);
@@ -61,7 +77,6 @@ function task(num) // only one argument since it can not take more then one ....
     fprintf file, "solutions_u_v := %o;\n", solutions_u_v; // Variety 
     fprintf file, "solutions_over_F := %o;\n", solutions_over_F;
     
-
     elapsed := Realtime(start_time); // to save the time needed per task 
 
     // create data file to save the time
@@ -70,34 +85,25 @@ function task(num) // only one argument since it can not take more then one ....
     fprintf file, "Time per task: %o\n", elapsed; // save the time
     delete file; // command to close the file safely - it does not delete the file!
 
-
-
-
     // update the status file
     if has_solution then
-
 		// mark status finished
 		file := Open(status_file, "w");
 		fprintf file, "finished\n";
 		delete file;
-		//return <num, list, #solutions_over_F, elapsed>;
 		return Sprintf("%o & %o  & %o \\\\", num, #solutions_over_F, #solutions_u_v); 
     else
 		// mark status finished
 		file := Open(status_file, "w");
 		fprintf file, "finished\n";
 		delete file;
-        //return <num, list, 0, elapsed>;
 		return Sprintf("%o  & 0  & 0 \\\\", num); 
     end if;
-
-
 
     return Sprintf("%o & %o & %o", num, worker_id, solutions_over_F);
 end function;
 
-
-MonitoredDistributedWorker(host, port, task);
+MonitoredDistributedWorker(host, port, task); // Connect to the manager and process assigned tasks.
 
 quit;
 

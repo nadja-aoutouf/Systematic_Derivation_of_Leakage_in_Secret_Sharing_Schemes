@@ -1,12 +1,34 @@
+ // ============================================================
+ // Distributed Manager 
+ // ============================================================
+ //
+ // This script manages the distributed search for linear exact
+ // repair schemes (LERSs) of Reed–Solomon codes.
+ //
+ // Variable-fixing strategy: Fix the first entry u_{j,1} of each helper vector u_j.
+ //   The first coordinate is the erased coordinate. The next l helper blocks are prescribed to be zero.
+ //   The remaining n-1-l helper blocks have rank at most one.
+ //
+ // The manager:
+ //   1. Enumerates all q^(n-1-l) assignments of fixed entries.
+ //   2. Filters assignments using the dual minimum distance.
+ //   3. Groups valid assignments into batches.
+ //   4. Distributes batches to workers using Magma sockets.
+ //
+ // ============================================================
+
 load "parameters.mag";
 
-//socket := Socket(: LocalHost := "localhost", LocalPort := port_num);
+// ------------------------------------------------------------
+// 1. Search-space parameters
+// ------------------------------------------------------------
+len := n - 1- l;         // Number of fixed entries per assignment.
+total := q^len;          // Total number of possible assignments before filtering.
+max_weight := n - k - 1; //  d_dual := (k+1) Maximum allowed numer of zeros (dual minimal distance)
 
-len := n - 1- l;
-total := q^len;
-
-
-// --- Define helper functions ---
+// ------------------------------------------------------------
+// 2. Helper functions
+// ------------------------------------------------------------
 
 // Convert integer to base-q vector of length `len`
 function int_to_binary_list(num, len, q)
@@ -18,30 +40,25 @@ function ZeroCount(vec)
     return #[ x : x in vec | x eq 0 ];
 end function;
 
-// --- Manager setup ---
-
-
-// Maximum allowed numer of zeros (dual minimal distance)
-max_weight := n - k - 1; //  d_dual := (k+1) 
-
-// --- Generate tasks with small numbers of zeros ---
-total := q^len;
-
-
-
-// --- define variables such that we have at most 2^30 tasks per batch ---
-batch_size := 2^10;              // upper bound per dispatch
+// ------------------------------------------------------------
+// 3. Batch configuration
+// ------------------------------------------------------------
+batch_size := 2^10;              // Maximum number of assignments per batch.
 batch      := [];                // current batch of task indices
 batch_no   := 0;                 // batch counter
 sent_total := 0;                 // total tasks sent so far
+
+// ------------------------------------------------------------
+// 4. Initialize manager–worker communication
+// ------------------------------------------------------------
 F := Open("port.txt","w");
 fprintf F, "%o\n", port_num;
 delete F;
 
-
-
+// ------------------------------------------------------------
+// 5. Dispatch a batch to distributed workers
+// ------------------------------------------------------------
 // helper function to run one batch on its own socket/port
-
 procedure RunOneBatch(B, batch_no)
     // choose a port per batch to avoid TIME_WAIT clashes
     P := port_num + batch_no;
@@ -56,14 +73,13 @@ procedure RunOneBatch(B, batch_no)
 
     // Start workers for this port (in the background)
     v1 := System("bash start_worker.sh &"); // we do not care about v1
-
     v2 := DistributedManager(s, B); // we do not care about v2
-
     delete s;  // ensures clean shutdown
 end procedure;
 
-
-// Build + dispatch in a single pass 
+// ------------------------------------------------------------
+// 6. Generate and filter candidate assignments
+// ------------------------------------------------------------
 t0 := Realtime();
 for i in [0..total-1] do
     vec := int_to_binary_list(i, len, q);
@@ -76,14 +92,16 @@ for i in [0..total-1] do
             //res := DistributedManager(socket, batch);
             RunOneBatch(batch,batch_no);
             print Sprintf("Batch %o time: %o", batch_no, Realtime() - tb);
-
             sent_total +:= #batch;
             batch := []; // clear for next round
         end if;
     end if;
 end for;
 
-// Flush any remaining tasks
+// ------------------------------------------------------------
+// 7. Dispatch remaining assignments
+// ------------------------------------------------------------
+// The final batch may contain fewer than batch_size tasks.
 if #batch gt 0 then
     batch_no +:= 1;
     print Sprintf("Dispatching batch %o (size %o)...", batch_no, #batch);
@@ -94,27 +112,11 @@ if #batch gt 0 then
     sent_total +:= #batch;
 end if;
 
+// ------------------------------------------------------------
+// 8. Report computation statistics
+// ------------------------------------------------------------
 print Sprintf("Dispatched %o tasks across %o batch(es).", sent_total, batch_no);
 print Sprintf("Total time: %o", Realtime() - t0);
-
-
-
-
-/////////////// old version ////////////////////////////////
-//params := [];
-
-//for i in [0..total-1] do
-//    vec := int_to_binary_list(i, len, q);
-//    if ZeroCount(vec) le max_weight then
-//        Append(~params, i);
-//    end if;
-//end for;
-
-
-//t0 := Realtime();
-//result := DistributedManager(socket, params);
-//print "Total time:", Realtime() - t0;
-//print result;
 
 quit;
 

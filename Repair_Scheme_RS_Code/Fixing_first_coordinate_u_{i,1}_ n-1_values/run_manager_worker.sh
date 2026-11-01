@@ -2,6 +2,22 @@
 #SBATCH --partition=algebra
 #SBATCH --cpus-per-task=64
 
+# ============================================================
+# SLURM Job Script for Distributed Computations
+# ============================================================
+#
+# This script launches the distributed computation 
+#
+# Variable-fixing strategy: Fix the first entry u_{j,1} of each helper vector u_j.
+#
+# Workflow:
+#   1. SLURM allocates the requested computing resources.
+#   2. The Magma manager enumerates candidate assignments.
+#   3. The manager starts workers through start_worker.sh.
+#   4. Workers solve the polynomial systems.
+#   5. The manager finishes after all batches are processed.
+#
+# ============================================================
 
 # Start the manager script (manager.mag)
 echo "Running manager.mag..."
