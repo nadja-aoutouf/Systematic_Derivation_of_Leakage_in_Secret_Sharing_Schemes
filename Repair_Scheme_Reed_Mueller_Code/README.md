@@ -8,7 +8,7 @@ The implementation fixes the first entry of each helper vector in a rank-one fac
 
 ## 1. Mathematical Background
 
-Let $K=\mathbb{F}_q$, $F=\mathbb{F}_{q^t}$, and $Q=q^t$. Consider the generalized Reed–Muller code $C=\operatorname{RM}(r,m)$ obtained by evaluating polynomials of total degree at most $r$ on a selected subset of $F^m$. For the full-length code, the support is $F^m$ and $n=(q^t)^m$.
+Let $K=\mathbb{F}_q$, $F=\mathbb{F}_{q^t}$, and $Q=q^t$. Consider the generalized Reed–Muller code $C$ with parameters $(r,m)$ obtained by evaluating polynomials of total degree at most $r$ on a selected subset of $F^m$. For the full-length code, the support is $F^m$ and $n=(q^t)^m$.
 
 We study linear exact repair of the first coordinate using the remaining $n-1$ coordinates. A repair scheme is represented by $t$ dual codewords whose values at the erased coordinate form a basis of $F$ over $K$. Writing their coordinates over $K$ gives a block matrix
 
@@ -110,11 +110,7 @@ Write $r_{\mathrm{dual}}=a(Q-1)+b$ with $0\le b<Q-1$. Its minimum distance is
 
 $$d(C^\perp)=(Q-b)Q^{m-a-1}.$$
 
-The manager accepts a fixed-entry assignment `vec` only if
-
-$$\operatorname{ZeroCount}(\mathrm{vec})\le n-d(C^\perp).$$
-
-This is the filter implemented in `manager.mag`; it does not add `l` to the zero count. The stated dual-distance formula is specific to the full-length code and must not be assumed unchanged for a modified evaluation support.
+The manager accepts a fixed-entry assignment `vec` only if the number of zeros is smaller than $n-d(C^\perp).$ This is the filter implemented in `manager.mag`. The stated dual-distance formula is specific to the full-length code and must not be assumed unchanged for a modified evaluation support.
 
 ### Batching and Parallelism
 
