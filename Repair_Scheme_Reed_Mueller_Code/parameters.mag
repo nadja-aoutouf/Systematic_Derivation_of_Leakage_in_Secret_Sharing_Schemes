@@ -1,0 +1,19 @@
+ // ============================================================
+ // Configuration for Distributed Reed–Muller Repair Scheme Computations
+ // ============================================================
+ //
+ // This file defines the parameters used by the manager–worker
+ // architecture for computing LERSs of Reed–Muller codes via a Gröbner approach.
+ // The computation uses Reed–Muller codes over GF(q^t), with polynomial order r and m evaluation variables.
+ //
+ // ------------------------------------------------------------
+
+ q := 2;    // Base field size: GF(q)
+ t := 2;    // Extension degree: GF(q^t) over GF(q)
+ r := 4;    // Maximum total degree of evaluated polynomials
+ m := 3;    // Number of polynomial variables
+ n := 64;   // Code length (full evaluation length: (q^t)^m)
+
+ s := 0;    // Index of the evaluation point removed from the support: [F!0] cat [F | a^i : i in [0..n-1] ] 
+
+ port_num := 40000;  // Base port for manager–worker communication

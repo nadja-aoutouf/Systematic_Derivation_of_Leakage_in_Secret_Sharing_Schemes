@@ -1,0 +1,110 @@
+ // ============================================================
+ // Worker for Distributed Reed–Muller Repair Scheme Computations
+ // ============================================================
+ //
+ // This file executes individual tasks assigned by the manager.
+ //
+ // Main tasks:
+ //   1. Reconstruct the fixed-variable assignment.
+ //   2. Create a task-specific output directory.
+ //   3. Solve the corresponding polynomial system.
+ //   4. Save the solutions and execution time.
+ //   5. Update the task status and return a summary.
+ //
+ // Variable-fixing strategy: Fixing n-1 values over GF(q).
+ //
+ // ============================================================
+
+load "parameters.mag";
+load "repair_scheme_solver.mag"; // loads the function: SetOfAllDualCodewords(q,t,r, m,n,s , list)
+
+host := "localhost";
+port := port_num;
+
+len := n - 1;   // Number of fixed-variable entries per task
+
+ // ------------------------------------------------------------
+ // Helper function and Worker configuration
+ // ------------------------------------------------------------
+
+function int_to_binary_list(num, len, q)
+    return [ (num div q^(i-1)) mod q : i in [len..1 by -1] ];
+end function;
+
+// Placeholders (will be replaced by shell)
+job_folder := "JOB_FOLDER_PLACEHOLDER";
+worker_id := WORKER_ID_PLACEHOLDER;
+
+ // ------------------------------------------------------------
+ // Task function
+ // ------------------------------------------------------------
+function task(num) 
+    start_time := Realtime();
+    task_folder := Sprintf("%o/Task_%o_%o", job_folder, worker_id, num);
+    System(Sprintf("mkdir -p %o", task_folder));
+    print Sprintf("Worker %o handling task %o in folder %o", worker_id, num, task_folder);
+    list := int_to_binary_list(num, len, q);
+
+    // create status file
+    status_file := Sprintf("%o/status_%o_%o.txt", task_folder, worker_id, num);
+    file := Open(status_file, "w");
+    fprintf file, "started\n";
+    delete file; // command to close the file safely - it does not delete the file!
+    has_solution, solutions_over_F, solutions_u_v := SetOfAllDualCodewords(q, t, r, m, n,s, list);
+
+	if not has_solution then 
+		solutions_over_F := [];
+		solutions_u_v := [];
+	end if;
+
+    // add Objects into Object file
+    filename := Sprintf("%o/objects.mag", task_folder);
+    file := Open(filename, "a");
+
+    WriteObject(file, num);
+    WriteObject(file, list);
+    WriteObject(file, solutions_u_v);
+    WriteObject(file, solutions_over_F);
+
+    // add information into output file
+    filename := Sprintf("%o/output.mag", task_folder);
+    file := Open(filename, "a");
+
+    fprintf file, "task_number := %o;\n", num;
+    fprintf file, "input_vector := %o;\n", list;             // task number encoded
+    fprintf file, "solutions_u_v := %o;\n", solutions_u_v; // Variety 
+    fprintf file, "solutions_over_F := %o;\n", solutions_over_F;
+    
+    elapsed := Realtime(start_time); // to save the time needed per task 
+
+    // create data file to save the time
+    data_file := Sprintf("%o/data_%o_%o.txt", task_folder, worker_id, num);
+    file := Open(data_file, "w");
+    fprintf file, "Time per task: %o\n", elapsed; // save the time
+    delete file; // command to close the file safely - it does not delete the file!
+
+    // update the status file
+    if has_solution then
+
+		// mark status finished
+		file := Open(status_file, "w");
+		fprintf file, "finished\n";
+		delete file;
+		return Sprintf("%o & %o  & %o \\\\", num, #solutions_over_F, #solutions_u_v); 
+    else
+		// mark status finished
+		file := Open(status_file, "w");
+		fprintf file, "finished\n";
+		delete file;
+		return Sprintf("%o  & 0  & 0 \\\\", num); 
+    end if;
+
+    return Sprintf("%o & %o & %o", num, worker_id, solutions_over_F);
+end function;
+
+ // ------------------------------------------------------------
+ // Start distributed worker
+ // ------------------------------------------------------------
+MonitoredDistributedWorker(host, port, task);
+
+quit;

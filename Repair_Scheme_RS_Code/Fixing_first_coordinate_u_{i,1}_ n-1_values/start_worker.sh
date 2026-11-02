@@ -19,7 +19,7 @@ set -euo pipefail
 # The manager invokes this script for each batch.
 # ============================================================
 
-MAX="${MAX:-64}"               # number of workers
+MAX="${SLURM_CPUS_PER_TASK:-1}"               # number of workers
 CMDLINE="${CMDLINE:-magma -b worker.mag}"
 
 # read parameters from parameters.mag into bash vars 

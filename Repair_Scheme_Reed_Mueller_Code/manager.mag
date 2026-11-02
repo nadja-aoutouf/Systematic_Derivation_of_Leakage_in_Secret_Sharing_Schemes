@@ -1,0 +1,95 @@
+ // ============================================================
+ // Manager for Distributed Reed–Muller Repair Scheme 
+ // ============================================================
+ //
+ // This file manages the distributed search for LERSs of Reed–Muller codes.
+ //
+ // Main tasks:
+ //   1. Load the code and computation parameters.
+ //   2. Compute the minimum distance of the dual Reed–Muller code.
+ //   3. Enumerate candidate fixed-variable assignments over GF(q).
+ //   4. Filter assignments using the dual minimum-distance bound.
+ //   5. Distribute accepted tasks to Magma workers in batches.
+ //
+ // Variable-fixing strategy: Fixing n-1 values over GF(q).
+ //
+ // ============================================================
+
+load "parameters.mag";
+
+socket := Socket(: LocalHost := "localhost", LocalPort := port_num);
+
+len := n - 1;       // Number of fixed entries
+total := q^len;     // Total number of candidate assignments
+
+ // ------------------------------------------------------------
+ // Helper functions
+ // ------------------------------------------------------------
+
+// Convert integer to base-q vector of length `len`
+function int_to_binary_list(num, len, q)
+    return [ (num div q^(i-1)) mod q : i in [len..1 by -1] ];
+end function;
+
+// Compute zero count (number of zero entries)
+function ZeroCount(vec)
+    return #[ x : x in vec | x eq 0 ];
+end function;
+
+ // ------------------------------------------------------------
+ // Compute the dual minimum-distance bound
+ // ------------------------------------------------------------
+
+// Maximum allowed numer of zeros (dual minimal distance)
+r_dual := m*(q^t-1)-r-1;
+
+a := r_dual div (q^t - 1);
+b := r_dual mod (q^t - 1);
+
+min_weight := (q^t - b) * (q^t)^(m - a - 1); //  min distance of the dual 
+
+max_zeros := n - min_weight;
+
+ // ------------------------------------------------------------
+ // Initiallize task batching + Enumerate, filter, and distribute tasks
+ // ------------------------------------------------------------
+batch_size := 2^14;              // upper bound per dispatch
+batch      := [];                // current batch of task indices
+batch_no   := 0;                 // batch counter
+sent_total := 0;                 // total tasks sent so far
+
+// Build + dispatch in a single pass 
+t0 := Realtime();
+for i in [0..total-1] do
+    vec := int_to_binary_list(i, len, q);
+    if ZeroCount(vec) le max_zeros then
+        Append(~batch, i);
+        if #batch eq batch_size then
+            batch_no +:= 1;
+            print Sprintf("Dispatching batch %o (size %o)...", batch_no, #batch);
+            tb := Realtime();
+            res := DistributedManager(socket, batch);
+            print Sprintf("Batch %o time: %o", batch_no, Realtime() - tb);
+            sent_total +:= #batch;
+            batch := []; // clear for next round
+        end if;
+    end if;
+end for;
+
+// Dispatch remaining tasks
+if #batch gt 0 then
+    batch_no +:= 1;
+    print Sprintf("Dispatching batch %o (size %o)...", batch_no, #batch);
+    tb := Realtime();
+    res := DistributedManager(socket, batch);
+    print Sprintf("Batch %o time: %o", batch_no, Realtime() - tb);
+    sent_total +:= #batch;
+end if;
+
+ // ------------------------------------------------------------
+ // Final computing summary
+ // ------------------------------------------------------------
+print Sprintf("Dispatched %o tasks across %o batch(es).", sent_total, batch_no);
+print Sprintf("Total time: %o", Realtime() - t0);
+
+quit;

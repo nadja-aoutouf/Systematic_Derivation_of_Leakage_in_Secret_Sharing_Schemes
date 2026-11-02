@@ -338,7 +338,5 @@ In particular:
 - Candidate filtering uses necessary minimum-distance conditions.
 - Computation time and memory usage depend strongly on the code parameters and resulting polynomial systems.
 - The launch scripts assume a compatible Magma and Slurm environment.
-- The current solver computes varieties only for zero-dimensional ideals.
-- Postprocessing removes duplicate solutions across processed tasks.
 
 The mathematical algorithms are implemented in Magma, while Bash scripts handle job orchestration and result collection.
