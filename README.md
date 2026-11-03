@@ -1,9 +1,9 @@
 # Systematic_Derivation_of_Leakage_in_Secret_Sharing_Schemes
-Computational methods for linear exact repair schemes and leakage attacks on Massey secret sharing, using Gröbner bases.
+Computational methods for linear exact repair schemes and leakage attacks on Massey secret sharing, using Gröbner bases (see https://arxiv.org/pdf/2611.03009)
 
 # Linear Exact Repair Schemes and Leakage Attacks
 
-This repository contains the computational framework and experiments supporting our research on **linear exact repair schemes (LERSs)** and their applications to leakage attacks on Massey secret sharing schemes.
+This repository contains the computational framework and experiments supporting our research on **linear exact repair schemes (LERSs)** and their applications to leakage attacks on Massey secret sharing schemes. 
 
 The project develops a systematic computational approach based on **Gröbner bases** to identify leakage functions associated with LERSs for arbitrary linear codes.
 
