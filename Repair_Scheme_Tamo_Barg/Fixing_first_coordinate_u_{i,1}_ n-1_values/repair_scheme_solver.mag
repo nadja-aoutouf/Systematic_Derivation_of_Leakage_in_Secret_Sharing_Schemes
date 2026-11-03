@@ -1,0 +1,307 @@
+// ============================================================
+// Solver for Tamo–Barg Repair Schemes
+// ============================================================
+//
+// Inputs:
+//   q    : size of the base field K = GF(q)
+//   t    : extension degree; F = GF(q^t)
+//   k    : number of generating monomials of the Tamo–Barg code
+//   n    : code length
+//   r    : locality parameter (local group size r+1)
+//   l    : number of prescribed zero helper blocks
+//   list : fixed first entries for the n-1-l nonzero-position helper vectors, in increasing coordinate order
+//   e    : index of the erased coordinate, e <= n-1
+//
+// Outputs:
+//   has_solution      : true if verified solutions were obtained
+//   solutions_over_F  : repair matrices over GF(q^t) (written as t x n matrix)
+//   solutions_uv      : polynomial-system solutions
+//
+// For each admissible zero set, the erased-coordinate block is I_t, the selected zero blocks vanish, and all other blocks
+// have the factorization u_j * v_j with the first entry of u_j fixed by the supplied assignment.
+// ============================================================
+
+SetOfAllDualCodewords := function(q,t,k,n,r,l,list, e)
+
+	K := GF(q); // Base field
+	F := GF(q^t); // Finite field GF(q^t);
+	a := Generator(F);
+
+	zeta := [a^i : i in [0..t-1]]; // basis 'zeta' of F over K
+	my_min_poly := MinimalPolynomial(a); // get the minimal polynomial 
+
+	// Define evaluation points in the order of the local groups
+	m := r + 1;
+	num_groups := n div m;      // assume exact division for simplicity
+
+	step := (q^t - 1) div m;    // so that a^step has order m 
+	h := a^step;                // generator of subgroup of size m
+
+	evaluation_points := [F| ];
+	for grp in [0..num_groups-1] do
+		beta := a^grp;          // choose coset representative 
+		for j in [0..m-1] do
+			Append(~evaluation_points, beta * h^j);
+		end for;
+	end for;
+
+	// search for subsets of size l satisfying the condition that the sum of evaluation point on zero positions is equal to the evaluation point
+	// corresponding to the erasued columns
+	if l eq 0 then
+		valid_zero_sets := [ {} ];
+	else
+		valid_zero_sets := [];
+
+		for S in Subsets({1..n} diff {e}, l) do
+			if &+[evaluation_points[j] : j in S] eq evaluation_points[e] then
+				Append(~valid_zero_sets, S);
+			end if;
+		end for;
+	end if;
+
+	// Check if there exist at least one valid zero set of size l. If not we can stop here
+	if #valid_zero_sets eq 0 then
+		return false, [], [];
+	end if;
+
+	// If yes iterate over all possible options for zero columns and save the solutions in AllSolutions
+	AllSolutions := [];
+	for zero_positions in valid_zero_sets do
+
+    	special := { e } join zero_positions;
+		var_positions := [ i : i in [1..n] | i notin special ];
+
+		// Define variables for the polynomial ring R1
+		v_vars := [ Sprintf("v_%o_%o", i, j) : i in var_positions, j in [1..t] ];
+		u_vars := [ Sprintf("u_%o_%o", i, j) : i in var_positions, j in [2..t] ];
+
+		// Create the polynomial ring with sets of variables
+		R1 := PolynomialRing(K, #v_vars + #u_vars, "elim", #v_vars);
+		AssignNames(~R1, v_vars cat u_vars); // First polynomial ring K[R121,…,Rtnt] 
+
+		// the variables are accessible as generators of R1
+		v_vars_poly := [ R1.i : i in [1..#v_vars ] ];
+		u_vars_poly := [ R1.i : i in [#v_vars + 1..#v_vars + #u_vars] ];
+
+		// =====================================================
+		// Define the matrix A over K which should include all the t codewords in F written over K
+		// =====================================================
+			
+		// Construct matrix A by horizontally concatenating t×t blocks
+		blocks := [];
+
+		pos_to_idx := AssociativeArray(Integers());
+		for s in [1..#var_positions] do
+			pos_to_idx[var_positions[s]] := s;
+		end for;
+
+		for j in [1..n] do
+
+			// block that corresponds to the erasured coesymbol is the identity matrix
+			if j eq e then
+				Append(~blocks, IdentityMatrix(R1, t));
+
+			// zero blocks for the forest zero columns 
+			elif j in zero_positions then
+				Append(~blocks, ZeroMatrix(R1, t, t));
+
+			// Other blocks are v_j * u_j
+			else
+				idx := pos_to_idx[j];
+
+				// u_j has first entry fixed from list[idx], remaining entries are variables
+				ustart := (t-1)*(idx-1);
+				u_j := Matrix(R1, t, 1,[ R1!list[idx] ] cat[ R1.(#v_vars + ustart + s) : s in [1..t-1] ]);
+
+				// v_j is all variables
+				vstart := t*(idx-1);
+				v_j := Matrix(R1, 1, t,[ R1.(vstart + s) : s in [1..t] ]);
+
+				Append(~blocks, Matrix(R1, t, t, Eltseq(u_j * v_j)));
+			end if;
+		end for;
+
+		// Join all t × t blocks into one t × (n·t) matrix
+		A := HorizontalJoin(blocks);
+
+		// =====================================================
+		// Define the generator matrix of RS(n,k) over K
+		// =====================================================
+
+		// Build TB exponents for general r,k
+		// Return the k exponents used in the standard TB monomial set for locality r.
+		// Pattern: take blocks of size r from each "level" j*(r+1), then take leftovers.
+
+		TBExponents := function(r, k)
+			m := r + 1;                 // local group size
+			full_levels := k div r;      // how many complete blocks of r exponents we need
+			extra := k mod r;           // how many more exponents we still need
+
+			exps := [ Integers() | ];
+
+			// Add full blocks: for each level j, add exponents j*m + 0, ..., j*m + (r-1)
+			for j in [0..full_levels-1] do
+				for offset in [0..r-1] do
+					Append(~exps, j*m + offset);
+				end for;
+			end for;
+
+			// Add leftover exponents at the next level: full_levels*m + 0, ..., + (extra-1)
+			for offset in [0..extra-1] do
+				Append(~exps, full_levels*m + offset);
+			end for;
+
+			return exps;  // length should be k
+		end function;
+
+		exps := TBExponents(r, k);
+		kRS  := Max(exps) + 1;
+
+		// Define the RS generator matrix over F
+		G_F := Matrix(F, kRS, n, [ evaluation_points[j]^(i-1) :  j in [1..n], i in [1..kRS] ]);
+
+		// Adapt it to the generator matrix for Tamo-Barg
+
+		// Keep rows with exponent e = i-1 not ≡ r (mod r+1)
+		row_indices := [ e+1 : e in exps ]; //[ i : i in [1..k] |  ((i-1) mod (r+1)) ne r];
+
+		//    Generator matrix of the Tamo–Barg code
+		G_TB := Submatrix(G_F, row_indices, [1..n]);
+
+		// Convert generator matrix entries to coordinates over K
+		// Each element in F is represented as a t-dimensional vector over K
+		// Final matrix will be k x (n * t) over K
+
+		// Multiplication table of F
+		MultTable := [ [Eltseq(zeta[i] * zeta[j]) : j in [1..t]] : i in [1..t] ];
+
+		// Now simulate multiplication
+		Equations := [];
+		for i in [1..#row_indices] do
+			for s in [1..t] do
+			Eq := [R1!0 : w in [1..t]];
+			for j in [1..n] do
+				g_coords := Eltseq(G_TB[i,j]);
+				a_coords := [ A[s][ (j-1)*t + v ] : v in [1..t] ];
+				for u in [1..t] do
+					for v in [1..t] do
+						prod := MultTable[u][v];
+						for w in [1..t] do
+							Eq[w] +:= g_coords[u] * a_coords[v] * prod[w];
+						end for;
+					end for;
+				end for;
+			end for;
+			Append(~Equations, Eq);
+			end for;
+		end for;
+
+		// Extract t rows/codewords as 1 x (t*n) submatrices
+		codewords_of_A  := [ Submatrix(A, i, 1, 1, t*n) : i in [1..t] ];
+
+		M_gen_list := [];
+		for i in [1..t*#row_indices] do
+			M_gen_list := M_gen_list cat Equations[i];
+		end for;
+
+		M_gen := Matrix(R1, #M_gen_list, 1, M_gen_list);
+
+		// Construct the corresponding zero matrix 
+		S_gen := Matrix(R1,  #M_gen_list, 1, [0: i in [1.. #M_gen_list]]);
+
+		// =====================================================
+		// Add field equations
+		// =====================================================
+
+		field_eqns := [ R1.i^q - R1.i : i in [1..#v_vars + #u_vars] ];
+		M_field_eq :=  Matrix(R1, #field_eqns , 1, field_eqns);
+		S_field_eq :=  Matrix(R1, #field_eqns , 1, [0 : i in [1..#field_eqns]]);
+
+		// =====================================================
+		// Build up the new system M=S over the base field that contains all equations
+		// =====================================================
+
+		seqM := Eltseq(M_field_eq) cat Eltseq(M_gen);
+		M := Matrix(R1, #seqM, 1, seqM);
+
+		seqS := Eltseq(S_field_eq) cat Eltseq(S_gen);
+		S := Matrix(R1, #seqS, 1, seqS);
+
+		// =====================================================
+		// Solve the system M=S over R1
+		// =====================================================
+
+		A_sol := M - S;
+		M_entries := Eltseq(A_sol);
+		M_entries1:=[R1!x : x in M_entries];
+
+		// =====================================================
+		// Resultant method in order to solve more efficently   
+		// =====================================================
+		// pick 30 v-variables to eliminate 
+		for idx in [1..Minimum(30, #v_vars)] do
+			x := R1.idx;
+			cand := [ f : f in M_entries1 | Degree(f, x) eq 1 ];
+			if #cand ge 2 then
+				res := Resultant(cand[1], cand[2], x);
+				Append(~M_entries1, res);
+			end if;
+		end for;
+
+		I := ideal<R1 | M_entries1>;
+
+		// Check if the ideal is zero-dimensional and compute variety only then
+		dim := Dimension(I);
+		if dim gt 0 then
+			continue;
+		end if;
+
+		V := Variety(I);
+		if #V eq 0 then
+			continue;
+		end if;
+
+		// Evaluate matrix A at each solution point
+		A_evaluated := [Matrix(K, t, t*n, [Evaluate(entry, v) : entry in Eltseq(A)]): v in V];
+		UniqueA := {@ A : A in A_evaluated @};
+
+		// Let us write the set of codewords over F instead of K
+		ConvertRowFromBits := func< bits | 
+			[F!Eltseq(Polynomial(K, bits[(i-1)*t+1 .. i*t])) : i in [1 .. #bits div t]] >;
+
+		ConvertListOfRows := function(row_list, t)
+			return Matrix(F, [ConvertRowFromBits(row) : row in row_list]);
+		end function;
+
+		row_lists := [[Eltseq(r) : r in Rows(sol)]: sol in UniqueA];
+		UniqueA_converted := [ConvertListOfRows(row_list, t): row_list in row_lists];
+
+		// Check if codewords are duals 
+		is_valid := true;
+		for i in [1..#row_lists] do
+			AF := ConvertListOfRows(row_lists[i], t);
+			Prod := G_TB * Transpose(AF);
+			if not forall{x : x in Eltseq(Prod) | x eq 0} then
+				is_valid := false;
+				break;
+			end if;
+		end for;
+
+		if not is_valid then
+			continue;
+		end if;
+
+		Append(~AllSolutions, <UniqueA_converted, V>);
+	end for;	
+
+	if #AllSolutions eq 0 then
+		return false, [], [];
+	end if;
+
+	solutions_over_F := &cat [ pair[1] : pair in AllSolutions];
+	solutions_uv := &cat [ pair[2] : pair in AllSolutions];
+
+	return true, solutions_over_F, solutions_uv;
+	
+end function;
+

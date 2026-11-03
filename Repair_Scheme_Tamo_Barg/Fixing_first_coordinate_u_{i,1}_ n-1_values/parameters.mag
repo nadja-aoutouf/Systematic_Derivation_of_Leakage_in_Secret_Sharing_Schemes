@@ -1,0 +1,20 @@
+ // ============================================================
+ // Configuration for Distributed Tamo–Barg Repair Scheme Computations
+ // ============================================================
+ //
+ // This file defines the parameters used by the manager–worker
+ // architecture for computing linear exact repair schemes (LERSs)
+ // of Tamo–Barg locally repairable codes via a Gröbner basis approach.
+ //
+ // ============================================================
+
+ q := 5;    // Base field size: GF(q)
+ t := 2;    // Extension degree: GF(q^t) over GF(q)
+ k := 15;   // Code dimension
+ n := 24;   // Code length
+ r := 5;    // Locality parameter of the Tamo–Barg code
+
+ l := 4;    // Number of prescribed zero helper blocks
+ e := 1;    // Index of the erased coordinate (1 <= e <= n)
+
+ port_num := 10101;  // Port for manager–worker communication

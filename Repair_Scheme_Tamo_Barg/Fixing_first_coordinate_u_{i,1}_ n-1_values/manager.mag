@@ -1,0 +1,123 @@
+ // ============================================================
+ // Manager for Distributed Tamo–Barg Repair Scheme Computations
+ // ============================================================
+ //
+ // This file manages the distributed search for LERSs of Tamo–Barg locally repairable codes
+ // using a Gröbner basis approach.
+ //
+ // Main tasks:
+ //   1. Load the code and repair parameters.
+ //   2. Enumerate candidate fixed-variable assignments.
+ //   3. Filter assignments using a prescribed zero-count bound.
+ //   4. Divide accepted tasks into batches.
+ //   5. Launch workers and distribute tasks using separate ports.
+ //   6. Record execution statistics.
+ //
+ // Variable-fixing strategy: Fixing n-1-l values over GF(q), with l prescribed zero blocks.
+ //
+ // ============================================================
+load "parameters.mag";
+
+len := n - 1- l;
+total := q^len;
+
+ // ------------------------------------------------------------
+ // Helper functions
+ // ------------------------------------------------------------
+// Convert integer to base-q vector of length `len`
+function int_to_binary_list(num, len, q)
+    return [ (num div q^(i-1)) mod q : i in [len..1 by -1] ];
+end function;
+
+// Compute zero count (number of zero entries)
+function ZeroCount(vec)
+    return #[ x : x in vec | x eq 0 ];
+end function;
+
+// Maximum allowed numer of zeros (dual minimal distance)
+max_weight := n - k - 1; //  d_dual := (k+1) 
+
+ // ------------------------------------------------------------
+ // Initialize batching
+ // ------------------------------------------------------------
+// define variables such that we have at most 2^10 tasks per batch 
+batch_size := 2^10;              // upper bound per dispatch
+batch      := [];                // current batch of task indices
+batch_no   := 0;                 // batch counter
+sent_total := 0;                 // total tasks sent so far
+
+fname := Sprintf("port_%o.txt", port_num);
+F := Open(fname, "w");
+fprintf F, "%o\n", port_num;
+delete F;
+
+ // ------------------------------------------------------------
+ // Define batch execution procedure
+ // ------------------------------------------------------------
+// helper function to run one batch on its own socket/port
+procedure RunOneBatch(B, batch_no)
+    // choose a port per batch to avoid TIME_WAIT clashes
+    P := port_num + batch_no;
+
+    // update port
+    fname := Sprintf("port_%o.txt", port_num);
+    F := Open(fname, "w");
+    fprintf F, "%o\n", P;
+    delete F;
+    print Sprintf("Using port %o", P);
+
+    // fresh socket for this batch
+    s := Socket(: LocalHost := "localhost", LocalPort := P);
+
+    // Start workers for this port (in the background)
+    v1 := System("bash start_worker.sh &"); // note v1 and v2 are dummy variables
+    v2 := DistributedManager(s, B);
+    delete s;
+end procedure;
+
+ // ------------------------------------------------------------
+ // Enumerate, filter, and distribute tasks
+ // ------------------------------------------------------------
+// Build + dispatch in a single pass 
+t0 := Realtime();
+for i in [0..total-1] do
+    vec := int_to_binary_list(i, len, q);
+    if ZeroCount(vec) + l le max_weight then // + 1 since l columns are zero and therefore the second codesymbol
+        Append(~batch, i);
+        if #batch eq batch_size then
+            batch_no +:= 1;
+            print Sprintf("Dispatching batch %o (size %o)...", batch_no, #batch);
+            tb := Realtime();
+            RunOneBatch(batch,batch_no);
+            print Sprintf("Batch %o time: %o", batch_no, Realtime() - tb);
+            sent_total +:= #batch;
+            batch := []; // clear for next round
+        end if;
+    end if;
+end for;
+
+// Flush any remaining tasks
+if #batch gt 0 then
+    batch_no +:= 1;
+    print Sprintf("Dispatching batch %o (size %o)...", batch_no, #batch);
+    tb := Realtime();
+    RunOneBatch(batch, batch_no);
+    print Sprintf("Batch %o time: %o", batch_no, Realtime() - tb);
+    sent_total +:= #batch;
+end if;
+
+ // ------------------------------------------------------------
+ // Print summary and job statistic
+ // ------------------------------------------------------------
+print Sprintf("Dispatched %o tasks across %o batch(es).", sent_total, batch_no);
+print Sprintf("Total time: %o", Realtime() - t0);
+
+job_folder := "JOB_FOLDER_PLACEHOLDER";
+data_file := Sprintf("%o/data_job.txt", job_folder);
+file := Open(data_file, "a");
+fprintf file, "Dispatched %o tasks across %o batch(es).\n", sent_total, batch_no;
+fprintf file, "Total time: %o\n", Realtime() - t0;
+delete file; 
+
+quit;
+
